@@ -9,8 +9,8 @@ export class Device {
 
 	connected = false
 
-	devicePoll: NodeJS.Timeout | null = null
-	deviceLongPoll: NodeJS.Timeout | null = null
+	devicePoll?: NodeJS.Timeout
+	deviceLongPoll?: NodeJS.Timeout
 
 	mainPlayerIdx = -1
 	current_snapshot = '-'
@@ -91,6 +91,7 @@ export class Device {
 	startDevicePoll(): void {
 		this.stopDevicePoll()
 
+		this.log('debug', `Starting device poll for ${this.host}`)
 		this.getDeviceInfo()
 		this.getPlayInfo()
 		this.getProfileNames()
@@ -108,12 +109,13 @@ export class Device {
 	stopDevicePoll(): void {
 		if (this.devicePoll) {
 			clearInterval(this.devicePoll)
-			this.devicePoll = null
+			delete this.devicePoll
 		}
 		if (this.deviceLongPoll) {
 			clearInterval(this.deviceLongPoll)
-			this.deviceLongPoll = null
+			delete this.deviceLongPoll
 		}
+		this.log('debug', `Stopped device poll for ${this.host}`)
 	}
 
 	sendCommand(
