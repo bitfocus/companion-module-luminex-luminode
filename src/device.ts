@@ -206,6 +206,9 @@ export class Device {
 				this.instance.setVariableValues({ active_profile_name: data.name })
 			}
 		} else if (cmd.startsWith('profile')) {
+			if (!Array.isArray(data)) {
+				return
+			}
 			const changedVariables: CompanionVariableValues = {}
 			data.forEach((profile: any) => {
 				const id = profile.id + 1

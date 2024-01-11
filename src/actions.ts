@@ -6,6 +6,7 @@ export enum ActionId {
 	Reboot = 'reboot',
 	Reset = 'reset',
 	RecallProfile = 'recall_profile',
+	SaveProfile = 'save_profile',
 	DisplayOn = 'display_on',
 	DmxAcknowledge = 'dmx_acknowledge',
 	DmxAcknowledgePort = 'dmx_acknowledge_port',
@@ -101,6 +102,37 @@ export function getActions(device: Device): { [id in ActionId]: CompanionActionD
 				const profile = Number(action.options.profile)
 				device.sendCommand(`profile/${profile - 1}/recall`, 'POST', {
 					keep_ip_settings: action.options.keep_ip_settings,
+				})
+			},
+		},
+		[ActionId.SaveProfile]: {
+			name: 'Save current configuration to profile',
+			options: [
+				{
+					type: 'number',
+					label: 'Profile number',
+					id: 'profile',
+					tooltip: '1-based profile number',
+					default: 1,
+					min: 1,
+					max: 40,
+				},
+				{
+					type: 'textinput',
+					label: 'Profile name',
+					id: 'name',
+					tooltip: 'The name that the new profile should get',
+					default: 'Profile',
+				},
+			],
+			callback: (action) => {
+				if (action.options.profile === undefined || action.options.name === undefined) {
+					device.log('info', `No profile number or name defined`)
+					return
+				}
+				const profile = Number(action.options.profile)
+				device.sendCommand(`profile/${profile - 1}/save`, 'POST', {
+					name: action.options.name.toString(),
 				})
 			},
 		},
