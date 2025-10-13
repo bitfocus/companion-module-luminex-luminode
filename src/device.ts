@@ -30,6 +30,17 @@ export class Device {
 		this.stopDevicePoll()
 	}
 
+	private safeStringify(value: unknown): string {
+		try {
+			if (typeof value === 'string') return value
+			if (value === null) return 'null'
+			if (value === undefined) return 'undefined'
+			return JSON.stringify(value)
+		} catch (_) {
+			return String(value)
+		}
+	}
+
 	updateStatus(status: InstanceStatus, msg: string | null = null): void {
 		this.connected = status === InstanceStatus.Ok
 		this.instance.updateStatus(status, msg)
@@ -59,7 +70,7 @@ export class Device {
 				if (res.status == 200) {
 					return
 				}
-				throw new Error(res.toString())
+				throw new Error(this.safeStringify(res))
 			})
 			.then(() => {
 				this.updateStatus(InstanceStatus.Ok)
@@ -157,7 +168,7 @@ export class Device {
 						throw new Error(`Unexpected content type: ${contentType}`)
 					}
 				} else {
-					throw new Error(res.toString())
+					throw new Error(this.safeStringify(res))
 				}
 			})
 			.catch((error) => {
