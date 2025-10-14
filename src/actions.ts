@@ -123,6 +123,7 @@ export function getActions(device: Device): { [id in ActionId]: CompanionActionD
 					id: 'name',
 					tooltip: 'The name that the new profile should get',
 					default: 'Profile',
+					useVariables: true,
 				},
 			],
 			callback: (action) => {
@@ -215,6 +216,7 @@ export function getActions(device: Device): { [id in ActionId]: CompanionActionD
 					id: 'snapshot_id',
 					default: '1.00',
 					regex: '^d+(.d{1,2})?$',
+					useVariables: true,
 				},
 			],
 			callback: (action) => {
