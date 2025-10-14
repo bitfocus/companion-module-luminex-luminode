@@ -1,5 +1,6 @@
 import { ModuleInstance } from './main.js'
 import { FeedbackId } from './feedbacks.js'
+import { WS } from './websocket.js'
 import { type CompanionVariableValues, InstanceStatus } from '@companion-module/base'
 
 export class Device {
@@ -8,9 +9,12 @@ export class Device {
 	instance: ModuleInstance
 
 	connected = false
+	use_websockets = false
 
 	devicePoll?: NodeJS.Timeout
 	deviceLongPoll?: NodeJS.Timeout
+
+	private ws?: WS
 
 	mainPlayerIdx = -1
 	current_snapshot = '-'
@@ -29,6 +33,9 @@ export class Device {
 	public async destroy(): Promise<void> {
 		this.log('debug', 'destroy')
 		this.stopDevicePoll()
+		this.ws?.close()
+		delete this.ws
+		this.updateStatus(InstanceStatus.Disconnected)
 	}
 
 	private safeStringify(value: unknown): string {
@@ -79,23 +86,76 @@ export class Device {
 									current_version: json.current,
 									alternate_version: json.alternate,
 								})
+								this.use_websockets = this.supportsWs()
+								this.log('debug', `Support for Websockets: ${this.use_websockets}`)
+								this.updateStatus(InstanceStatus.Ok)
+								if (this.use_websockets) {
+									this.createWebSocket()
+								}
+								this.startDevicePoll()
 							})
 							.catch((error) => {
 								this.log('debug', `Failed to parse software version: ${error.toString()}`)
+								this.updateStatus(InstanceStatus.ConnectionFailure)
 							})
 					}
 					return
 				}
 				throw new Error(this.safeStringify(res))
 			})
-			.then(() => {
-				this.updateStatus(InstanceStatus.Ok)
-				this.startDevicePoll()
-			})
 			.catch((error) => {
 				this.log('debug', error)
 				this.updateStatus(InstanceStatus.ConnectionFailure)
 			})
+	}
+
+	/**
+	 * Determine whether this device version supports WebSocket features.
+	 * Returns true for versions >= 2.7.0, false otherwise.
+	 */
+	supportsWs(): boolean {
+		const verRaw = this.versionInfo?.current
+		if (!verRaw || typeof verRaw !== 'string') return false
+
+		// Match version at start like: v2.7.1 or 2.7.1 or 2.7.1RC1-...
+		const m = verRaw.match(/^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/)
+		// If no match: assume custom firmware that supports WebSockets
+		if (!m) return true
+
+		const major = parseInt(m[1] ?? '0', 10)
+		const minor = parseInt(m[2] ?? '0', 10)
+		const patch = parseInt(m[3] ?? '0', 10)
+		if (isNaN(major) || isNaN(minor) || isNaN(patch)) return false
+
+		// Compare to 2.7.0
+		if (major > 2) return true
+		if (major < 2) return false
+		if (minor > 7) return true
+		if (minor < 7) return false
+		return patch >= 0
+	}
+
+	createWebSocket(): void {
+		if (!this.use_websockets) {
+			return
+		}
+		if (this.ws != undefined) {
+			this.ws.close()
+			delete this.ws
+		}
+		this.ws = new WS(this.host, {
+			onopen: this.websocketOpen.bind(this),
+			onmessage: this.websocketMessage.bind(this),
+			onerror: this.websocketError.bind(this),
+			ondisconnect: this.websocketDisconnect.bind(this),
+		})
+	}
+
+	initWebSocket(): void {
+		if (!this.use_websockets) {
+			return
+		}
+		this.ws?.init()
 	}
 
 	getDeviceInfo(): void {
@@ -117,6 +177,10 @@ export class Device {
 
 	startDevicePoll(): void {
 		this.stopDevicePoll()
+
+		if (this.use_websockets) {
+			this.initWebSocket()
+		}
 
 		this.log('debug', `Starting device poll for ${this.host}`)
 		this.getDeviceInfo()
@@ -252,6 +316,37 @@ export class Device {
 			this.getPlayInfo()
 		} else {
 			this.log('debug', `Unhandled command ${cmd}: ${JSON.stringify(data)}`)
+		}
+	}
+
+	websocketOpen(): void {
+		this.updateStatus(InstanceStatus.Ok)
+		this.log('debug', `Connection opened to ${this.host}`)
+	}
+
+	websocketError(data: string): void {
+		this.log('error', `WebSocket error: ${this.safeStringify(data)}`)
+	}
+
+	websocketDisconnect(msg: string): void {
+		this.log('debug', msg)
+		this.updateStatus(InstanceStatus.Disconnected, msg)
+	}
+
+	// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+	websocketMessage(msgValue: any): void {
+		// TODO: Check and implement
+		this.log('info', `WS message: ${this.safeStringify(msgValue)}`)
+		if (msgValue && msgValue.api_notification) {
+			if (['path', 'new_value'].every((key) => Object.keys(msgValue.api_notification).includes(key))) {
+				const path = msgValue.api_notification.path
+				const data = msgValue.api_notification.new_value
+				const cmd = path.replace('/api/', '')
+				//this.log('debug', `ws message from ${cmd}  : ${JSON.stringify(data)}`)
+				this.processData(cmd, data)
+			} else {
+				this.log('debug', `invalid msg: ${JSON.stringify(msgValue.api_notification)}`)
+			}
 		}
 	}
 }
