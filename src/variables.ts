@@ -53,6 +53,16 @@ export function getVariables(): CompanionVariableDefinition[] {
 		name: 'Active Profile Name',
 	})
 
+	variables.push({
+		variableId: 'current_version',
+		name: 'Current Software Version',
+	})
+
+	variables.push({
+		variableId: 'alternate_version',
+		name: 'Alternate Software Version',
+	})
+
 	Array(40)
 		.fill(0)
 		.forEach((_, i) => {

@@ -19,6 +19,7 @@ export class Device {
 	active_profile?: string
 	profiles: any[] = []
 	deviceInfo?: any
+	versionInfo?: any
 
 	constructor(instance: ModuleInstance) {
 		this.instance = instance
@@ -65,9 +66,24 @@ export class Device {
 		const options = {
 			headers: requestHeaders,
 		}
-		fetch(`http://${this.host}/api/deviceinfo`, options)
+		fetch(`http://${this.host}/api/software/version`, options)
 			.then(async (res) => {
-				if (res.status == 200) {
+				if (res.ok) {
+					const contentType = res.headers.get('content-type')
+					if (contentType && contentType.indexOf('application/json') !== -1) {
+						res
+							.json()
+							.then((json: any) => {
+								this.versionInfo = json
+								this.instance.setVariableValues({
+									current_version: json.current,
+									alternate_version: json.alternate,
+								})
+							})
+							.catch((error) => {
+								this.log('debug', `Failed to parse software version: ${error.toString()}`)
+							})
+					}
 					return
 				}
 				throw new Error(this.safeStringify(res))
