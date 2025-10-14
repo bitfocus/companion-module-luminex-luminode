@@ -62,10 +62,24 @@ export class WS {
 		}
 		this.ws = new WebSocket(url, ['luminex-luminode-v1-json'])
 
-		this.ws.onopen = this.websocketOpen.bind(this)
-		this.ws.onclose = this.websocketClose.bind(this)
-		this.ws.onmessage = this.messageReceivedFromWebSocket.bind(this)
-		this.ws.onerror = this.websocketError.bind(this)
+		// Use event listeners which are the standard for the Node 'ws' package.
+		// Keep the onXXX fallback for environments that expect it.
+		if ('on' in this.ws && typeof (this.ws as any).on === 'function') {
+			// ws (node) event signatures differ from browser WebSocket.
+			;(this.ws as any).on('open', () => this.websocketOpen())
+			;(this.ws as any).on('close', (code: number, _reason: Buffer) => this.websocketClose({ code } as any))
+			;(this.ws as any).on('message', (data: WebSocket.Data) =>
+				// wrap into an object with `.data` to match messageReceivedFromWebSocket
+				this.messageReceivedFromWebSocket({ data } as any),
+			)
+			;(this.ws as any).on('error', (err: Error) => this.websocketError(err as any))
+		} else {
+			// browser-like WebSocket
+			this.ws.onopen = this.websocketOpen.bind(this)
+			this.ws.onclose = this.websocketClose.bind(this)
+			this.ws.onmessage = this.messageReceivedFromWebSocket.bind(this)
+			this.ws.onerror = this.websocketError.bind(this)
+		}
 	}
 
 	public close(): void {
@@ -130,7 +144,16 @@ export class WS {
 			clearTimeout(this.pong_timeout)
 			delete this.pong_timeout
 		}
+
+		// If a socket object is still present try to close it gracefully.
+		try {
+			this.ws?.close(1000)
+		} catch (_) {
+			/* ignore */
+		}
+
 		this.reconnect_timer = setTimeout(() => {
+			delete this.reconnect_timer
 			this.init()
 		}, 5000)
 	}
