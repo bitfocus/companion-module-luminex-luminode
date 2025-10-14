@@ -268,6 +268,9 @@ export class Device {
 			this.instance.setVariableValues({
 				short_name: data.short_name,
 				long_name: data.long_name,
+				device_id: data.ID,
+				color_1: data.colors?.[0] ?? '',
+				color_2: data.colors?.[1] ?? '',
 				nr_dmx_ports: data.nr_dmx_ports,
 				nr_processblocks: data.nr_processblocks,
 				serial: data.serial,

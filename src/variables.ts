@@ -14,6 +14,21 @@ export function getVariables(): CompanionVariableDefinition[] {
 	})
 
 	variables.push({
+		variableId: 'device_id',
+		name: 'Device ID',
+	})
+
+	variables.push({
+		variableId: 'color_1',
+		name: 'Device Color 1',
+	})
+
+	variables.push({
+		variableId: 'color_2',
+		name: 'Device Color 2',
+	})
+
+	variables.push({
 		variableId: 'nr_dmx_ports',
 		name: 'Number of DMX ports',
 	})
