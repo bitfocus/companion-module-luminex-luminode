@@ -180,21 +180,26 @@ export class Device {
 
 		if (this.use_websockets) {
 			this.initWebSocket()
+		} else {
+			this.getDeviceInfo()
+			this.getProfileNames()
 		}
+		this.getPlayInfo()
 
 		this.log('debug', `Starting device poll for ${this.host}`)
-		this.getDeviceInfo()
-		this.getPlayInfo()
-		this.getProfileNames()
 
 		this.devicePoll = setInterval(() => {
-			this.getDeviceInfo()
+			if (!this.use_websockets) {
+				this.getDeviceInfo()
+			}
 			this.getPlayInfo()
 		}, 5000)
 
-		this.deviceLongPoll = setInterval(() => {
-			this.getProfileNames()
-		}, 15000)
+		if (!this.use_websockets) {
+			this.deviceLongPoll = setInterval(() => {
+				this.getProfileNames()
+			}, 15000)
+		}
 	}
 
 	stopDevicePoll(): void {
@@ -319,6 +324,14 @@ export class Device {
 		}
 	}
 
+	updateProfile(id: number, profile: { name: string }): void {
+		const oldProfile = this.profiles?.find(({ profileId }) => profileId === id)
+		if (!oldProfile || oldProfile?.name !== profile.name) {
+			this.instance.setVariableValues({ [`profile_${id + 1}_name`]: profile.name })
+		}
+		this.profiles[id] = profile
+	}
+
 	websocketOpen(): void {
 		this.updateStatus(InstanceStatus.Ok)
 		this.log('debug', `Connection opened to ${this.host}`)
@@ -335,17 +348,24 @@ export class Device {
 
 	// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 	websocketMessage(msgValue: any): void {
-		// TODO: Check and implement
-		this.log('info', `WS message: ${this.safeStringify(msgValue)}`)
-		if (msgValue && msgValue.api_notification) {
-			if (['path', 'new_value'].every((key) => Object.keys(msgValue.api_notification).includes(key))) {
-				const path = msgValue.api_notification.path
-				const data = msgValue.api_notification.new_value
-				const cmd = path.replace('/api/', '')
-				//this.log('debug', `ws message from ${cmd}  : ${JSON.stringify(data)}`)
-				this.processData(cmd, data)
+		if (msgValue && msgValue.op && msgValue.path) {
+			if (msgValue.path === '/api') {
+				this.processData('deviceinfo', msgValue.value.deviceinfo)
+				this.processData('active_profile_name', msgValue.value.active_profile_name)
+				this.processData('profile', msgValue.value.profile)
+			} else if (msgValue.path === '/api/deviceinfo') {
+				this.processData('deviceinfo', msgValue.value)
+			} else if (msgValue.path === '/api/active_profile_name') {
+				this.processData('active_profile_name', msgValue.value)
+			} else if (msgValue.path.startsWith('/api/profile')) {
+				if (msgValue.op === 'replace') {
+					const profileId = parseInt(msgValue.path.replace('/api/profile/', ''), 10)
+					this.updateProfile(profileId, msgValue.value)
+				} else {
+					this.log('debug', `Unhandled profile WS message: ${msgValue.path} (${msgValue.op})`)
+				}
 			} else {
-				this.log('debug', `invalid msg: ${JSON.stringify(msgValue.api_notification)}`)
+				this.log('debug', `Unhandled WS message: ${msgValue.path}`)
 			}
 		}
 	}
