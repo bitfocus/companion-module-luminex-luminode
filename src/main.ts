@@ -59,7 +59,7 @@ export class ModuleInstance extends InstanceBase<config> {
 
 	initVariables(): void {
 		if (this.device) {
-			const variables = getVariables()
+			const variables = getVariables(this.device)
 			this.setVariableDefinitions(variables)
 		} else {
 			this.setVariableDefinitions([])

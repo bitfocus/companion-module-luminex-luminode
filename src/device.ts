@@ -1,5 +1,6 @@
 import { ModuleInstance } from './main.js'
 import { FeedbackId } from './feedbacks.js'
+import { WS } from './websocket.js'
 import { type CompanionVariableValues, InstanceStatus } from '@companion-module/base'
 
 export class Device {
@@ -8,9 +9,12 @@ export class Device {
 	instance: ModuleInstance
 
 	connected = false
+	use_websockets = false
 
 	devicePoll?: NodeJS.Timeout
 	deviceLongPoll?: NodeJS.Timeout
+
+	private ws?: WS
 
 	mainPlayerIdx = -1
 	current_snapshot = '-'
@@ -18,7 +22,9 @@ export class Device {
 
 	active_profile?: string
 	profiles: any[] = []
+	processblocks: any[] = []
 	deviceInfo?: any
+	versionInfo?: any
 
 	constructor(instance: ModuleInstance) {
 		this.instance = instance
@@ -28,6 +34,9 @@ export class Device {
 	public async destroy(): Promise<void> {
 		this.log('debug', 'destroy')
 		this.stopDevicePoll()
+		this.ws?.close()
+		delete this.ws
+		this.updateStatus(InstanceStatus.Disconnected)
 	}
 
 	private safeStringify(value: unknown): string {
@@ -65,21 +74,89 @@ export class Device {
 		const options = {
 			headers: requestHeaders,
 		}
-		fetch(`http://${this.host}/api/deviceinfo`, options)
+		fetch(`http://${this.host}/api/software/version`, options)
 			.then(async (res) => {
-				if (res.status == 200) {
+				if (res.ok) {
+					const contentType = res.headers.get('content-type')
+					if (contentType && contentType.indexOf('application/json') !== -1) {
+						res
+							.json()
+							.then((json: any) => {
+								this.versionInfo = json
+								this.instance.setVariableValues({
+									current_version: json.current,
+									alternate_version: json.alternate,
+								})
+								this.use_websockets = this.supportsWs()
+								this.log('debug', `Support for Websockets: ${this.use_websockets}`)
+								this.updateStatus(InstanceStatus.Ok)
+								if (this.use_websockets) {
+									this.createWebSocket()
+								}
+								this.startDevicePoll()
+							})
+							.catch((error) => {
+								this.log('debug', `Failed to parse software version: ${error.toString()}`)
+								this.updateStatus(InstanceStatus.ConnectionFailure)
+							})
+					}
 					return
 				}
 				throw new Error(this.safeStringify(res))
-			})
-			.then(() => {
-				this.updateStatus(InstanceStatus.Ok)
-				this.startDevicePoll()
 			})
 			.catch((error) => {
 				this.log('debug', error)
 				this.updateStatus(InstanceStatus.ConnectionFailure)
 			})
+	}
+
+	/**
+	 * Determine whether this device version supports WebSocket features.
+	 * Returns true for versions >= 2.7.0, false otherwise.
+	 */
+	supportsWs(): boolean {
+		const verRaw = this.versionInfo?.current
+		if (!verRaw || typeof verRaw !== 'string') return false
+
+		// Match version at start like: v2.7.1 or 2.7.1 or 2.7.1RC1-...
+		const m = verRaw.match(/^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/)
+		// If no match: assume custom firmware that supports WebSockets
+		if (!m) return true
+
+		const major = parseInt(m[1] ?? '0', 10)
+		const minor = parseInt(m[2] ?? '0', 10)
+		const patch = parseInt(m[3] ?? '0', 10)
+		if (isNaN(major) || isNaN(minor) || isNaN(patch)) return false
+
+		// Compare to 2.7.0
+		if (major > 2) return true
+		if (major < 2) return false
+		if (minor > 7) return true
+		if (minor < 7) return false
+		return patch >= 0
+	}
+
+	createWebSocket(): void {
+		if (!this.use_websockets) {
+			return
+		}
+		if (this.ws != undefined) {
+			this.ws.close()
+			delete this.ws
+		}
+		this.ws = new WS(this.host, {
+			onopen: this.websocketOpen.bind(this),
+			onmessage: this.websocketMessage.bind(this),
+			onerror: this.websocketError.bind(this),
+			ondisconnect: this.websocketDisconnect.bind(this),
+		})
+	}
+
+	initWebSocket(): void {
+		if (!this.use_websockets) {
+			return
+		}
+		this.ws?.init()
 	}
 
 	getDeviceInfo(): void {
@@ -102,19 +179,28 @@ export class Device {
 	startDevicePoll(): void {
 		this.stopDevicePoll()
 
-		this.log('debug', `Starting device poll for ${this.host}`)
-		this.getDeviceInfo()
+		if (this.use_websockets) {
+			this.initWebSocket()
+		} else {
+			this.getDeviceInfo()
+			this.getProfileNames()
+		}
 		this.getPlayInfo()
-		this.getProfileNames()
+
+		this.log('debug', `Starting device poll for ${this.host}`)
 
 		this.devicePoll = setInterval(() => {
-			this.getDeviceInfo()
+			if (!this.use_websockets) {
+				this.getDeviceInfo()
+			}
 			this.getPlayInfo()
 		}, 5000)
 
-		this.deviceLongPoll = setInterval(() => {
-			this.getProfileNames()
-		}, 15000)
+		if (!this.use_websockets) {
+			this.deviceLongPoll = setInterval(() => {
+				this.getProfileNames()
+			}, 15000)
+		}
 	}
 
 	stopDevicePoll(): void {
@@ -183,6 +269,9 @@ export class Device {
 			this.instance.setVariableValues({
 				short_name: data.short_name,
 				long_name: data.long_name,
+				device_id: data.ID,
+				color_1: data.colors?.[0] ?? '',
+				color_2: data.colors?.[1] ?? '',
 				nr_dmx_ports: data.nr_dmx_ports,
 				nr_processblocks: data.nr_processblocks,
 				serial: data.serial,
@@ -230,12 +319,105 @@ export class Device {
 			})
 			this.instance.setVariableValues(changedVariables)
 			this.profiles = data
+		} else if (cmd.startsWith('processblock')) {
+			if (!Array.isArray(data)) {
+				return
+			}
+			const changedVariables: CompanionVariableValues = {}
+			data.forEach((processblock: any) => {
+				const id = processblock.id + 1
+				const oldPb = this.processblocks?.find(({ processblockId }) => processblockId === processblock.id)
+				if (!oldPb || oldPb?.name !== processblock.name) {
+					changedVariables[`processblock_${id}_name`] = processblock.name
+				}
+				if (!oldPb || oldPb?.colors !== processblock.colors) {
+					changedVariables[`processblock_${id}_color_1`] = processblock.colors?.[0] ?? ''
+					changedVariables[`processblock_${id}_color_2`] = processblock.colors?.[1] ?? ''
+				}
+				if (!oldPb || oldPb?.mode !== processblock.mode) {
+					changedVariables[`processblock_${id}_mode`] = processblock.mode
+				}
+			})
+			this.instance.setVariableValues(changedVariables)
+			this.processblocks = data
 		} else if (cmd.startsWith('play/control')) {
 			this.getPlayInfo()
 		} else if (cmd.startsWith('play/play_snapshot')) {
 			this.getPlayInfo()
 		} else {
 			this.log('debug', `Unhandled command ${cmd}: ${JSON.stringify(data)}`)
+		}
+	}
+
+	updateProfile(id: number, profile: { name: string }): void {
+		const oldProfile = this.profiles?.find(({ profileId }) => profileId === id)
+		if (!oldProfile || oldProfile?.name !== profile.name) {
+			this.instance.setVariableValues({ [`profile_${id + 1}_name`]: profile.name })
+		}
+		this.profiles[id] = profile
+	}
+
+	updateProcessblock(id: number, processblock: { name: string; colors: string[]; mode: string }): void {
+		const oldPb = this.processblocks?.find(({ processblockId }) => processblockId === id)
+		const changedVariables: CompanionVariableValues = {}
+		if (!oldPb || oldPb?.name !== processblock.name) {
+			changedVariables[`processblock_${id + 1}_name`] = processblock.name
+		}
+		if (!oldPb || oldPb?.colors !== processblock.colors) {
+			changedVariables[`processblock_${id + 1}_color_1`] = processblock.colors[0] ?? ''
+			changedVariables[`processblock_${id + 1}_color_2`] = processblock.colors[1] ?? ''
+		}
+		if (!oldPb || oldPb?.mode !== processblock.mode) {
+			changedVariables[`processblock_${id + 1}_mode`] = processblock.mode
+		}
+		this.processblocks[id] = processblock
+		this.instance.setVariableValues(changedVariables)
+	}
+
+	websocketOpen(): void {
+		this.updateStatus(InstanceStatus.Ok)
+		this.log('debug', `Connection opened to ${this.host}`)
+	}
+
+	websocketError(data: string): void {
+		this.log('error', `WebSocket error: ${this.safeStringify(data)}`)
+	}
+
+	websocketDisconnect(msg: string): void {
+		this.log('debug', msg)
+		this.updateStatus(InstanceStatus.Disconnected, msg)
+	}
+
+	// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+	websocketMessage(msgValue: any): void {
+		if (msgValue && msgValue.op && msgValue.path) {
+			if (msgValue.path === '/api') {
+				this.processData('deviceinfo', msgValue.value.deviceinfo)
+				this.instance.initVariables()
+				this.processData('active_profile_name', msgValue.value.active_profile_name)
+				this.processData('profile', msgValue.value.profile)
+				this.processData('processblock', msgValue.value.processblock)
+			} else if (msgValue.path === '/api/deviceinfo') {
+				this.processData('deviceinfo', msgValue.value)
+			} else if (msgValue.path === '/api/active_profile_name') {
+				this.processData('active_profile_name', msgValue.value)
+			} else if (msgValue.path.startsWith('/api/profile')) {
+				if (msgValue.op === 'replace') {
+					const profileId = parseInt(msgValue.path.replace('/api/profile/', ''), 10)
+					this.updateProfile(profileId, msgValue.value)
+				} else {
+					this.log('debug', `Unhandled profile WS message: ${msgValue.path} (${msgValue.op})`)
+				}
+			} else if (/^\/api\/processblock\/\d+$/.test(msgValue.path)) {
+				if (msgValue.op === 'replace') {
+					const pbId = parseInt(msgValue.path.replace('/api/processblock/', ''), 10)
+					this.updateProcessblock(pbId, msgValue.value)
+				} else {
+					this.log('debug', `Unhandled processblock WS message: ${msgValue.path} (${msgValue.op})`)
+				}
+			} else {
+				// this.log('debug', `Unhandled WS message: ${msgValue.path}`)
+			}
 		}
 	}
 }
