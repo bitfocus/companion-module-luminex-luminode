@@ -22,6 +22,7 @@ export class Device {
 
 	active_profile?: string
 	profiles: any[] = []
+	processblocks: any[] = []
 	deviceInfo?: any
 	versionInfo?: any
 
@@ -318,6 +319,27 @@ export class Device {
 			})
 			this.instance.setVariableValues(changedVariables)
 			this.profiles = data
+		} else if (cmd.startsWith('processblock')) {
+			if (!Array.isArray(data)) {
+				return
+			}
+			const changedVariables: CompanionVariableValues = {}
+			data.forEach((processblock: any) => {
+				const id = processblock.id + 1
+				const oldPb = this.processblocks?.find(({ processblockId }) => processblockId === processblock.id)
+				if (!oldPb || oldPb?.name !== processblock.name) {
+					changedVariables[`processblock_${id}_name`] = processblock.name
+				}
+				if (!oldPb || oldPb?.colors !== processblock.colors) {
+					changedVariables[`processblock_${id}_color_1`] = processblock.colors?.[0] ?? ''
+					changedVariables[`processblock_${id}_color_2`] = processblock.colors?.[1] ?? ''
+				}
+				if (!oldPb || oldPb?.mode !== processblock.mode) {
+					changedVariables[`processblock_${id}_mode`] = processblock.mode
+				}
+			})
+			this.instance.setVariableValues(changedVariables)
+			this.processblocks = data
 		} else if (cmd.startsWith('play/control')) {
 			this.getPlayInfo()
 		} else if (cmd.startsWith('play/play_snapshot')) {
@@ -333,6 +355,23 @@ export class Device {
 			this.instance.setVariableValues({ [`profile_${id + 1}_name`]: profile.name })
 		}
 		this.profiles[id] = profile
+	}
+
+	updateProcessblock(id: number, processblock: { name: string; colors: string[]; mode: string }): void {
+		const oldPb = this.processblocks?.find(({ processblockId }) => processblockId === id)
+		const changedVariables: CompanionVariableValues = {}
+		if (!oldPb || oldPb?.name !== processblock.name) {
+			changedVariables[`processblock_${id + 1}_name`] = processblock.name
+		}
+		if (!oldPb || oldPb?.colors !== processblock.colors) {
+			changedVariables[`processblock_${id + 1}_color_1`] = processblock.colors[0] ?? ''
+			changedVariables[`processblock_${id + 1}_color_2`] = processblock.colors[1] ?? ''
+		}
+		if (!oldPb || oldPb?.mode !== processblock.mode) {
+			changedVariables[`processblock_${id + 1}_mode`] = processblock.mode
+		}
+		this.processblocks[id] = processblock
+		this.instance.setVariableValues(changedVariables)
 	}
 
 	websocketOpen(): void {
@@ -354,8 +393,10 @@ export class Device {
 		if (msgValue && msgValue.op && msgValue.path) {
 			if (msgValue.path === '/api') {
 				this.processData('deviceinfo', msgValue.value.deviceinfo)
+				this.instance.initVariables()
 				this.processData('active_profile_name', msgValue.value.active_profile_name)
 				this.processData('profile', msgValue.value.profile)
+				this.processData('processblock', msgValue.value.processblock)
 			} else if (msgValue.path === '/api/deviceinfo') {
 				this.processData('deviceinfo', msgValue.value)
 			} else if (msgValue.path === '/api/active_profile_name') {
@@ -367,8 +408,15 @@ export class Device {
 				} else {
 					this.log('debug', `Unhandled profile WS message: ${msgValue.path} (${msgValue.op})`)
 				}
+			} else if (/^\/api\/processblock\/\d+$/.test(msgValue.path)) {
+				if (msgValue.op === 'replace') {
+					const pbId = parseInt(msgValue.path.replace('/api/processblock/', ''), 10)
+					this.updateProcessblock(pbId, msgValue.value)
+				} else {
+					this.log('debug', `Unhandled processblock WS message: ${msgValue.path} (${msgValue.op})`)
+				}
 			} else {
-				this.log('debug', `Unhandled WS message: ${msgValue.path}`)
+				// this.log('debug', `Unhandled WS message: ${msgValue.path}`)
 			}
 		}
 	}

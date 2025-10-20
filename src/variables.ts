@@ -1,6 +1,7 @@
 import type { CompanionVariableDefinition } from '@companion-module/base'
+import { Device } from './device.js'
 
-export function getVariables(): CompanionVariableDefinition[] {
+export function getVariables(device: Device): CompanionVariableDefinition[] {
 	const variables = []
 
 	variables.push({
@@ -87,6 +88,30 @@ export function getVariables(): CompanionVariableDefinition[] {
 				variableId: `profile_${id}_name`,
 			})
 		})
+
+	if (device.use_websockets && device.deviceInfo?.nr_processblocks) {
+		Array(device.deviceInfo.nr_processblocks)
+			.fill(0)
+			.forEach((_, index) => {
+				const id = index + 1
+				variables.push({
+					name: `Process Block ${id} name`,
+					variableId: `processblock_${id}_name`,
+				})
+				variables.push({
+					name: `Process Block ${id} color 1`,
+					variableId: `processblock_${id}_color_1`,
+				})
+				variables.push({
+					name: `Process Block ${id} color 2`,
+					variableId: `processblock_${id}_color_2`,
+				})
+				variables.push({
+					name: `Process Block ${id} mode`,
+					variableId: `processblock_${id}_mode`,
+				})
+			})
+	}
 
 	return variables
 }
