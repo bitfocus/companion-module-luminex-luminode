@@ -14,6 +14,7 @@ export enum ActionId {
 	ForceRdmDiscoveryPort = 'force_rdm_discovery_port',
 	PlayControl = 'play_control',
 	PlaySnapshot = 'play_snapshot',
+	RecordSnapshot = 'record_snapshot',
 }
 
 export function getActions(device: Device): { [id in ActionId]: CompanionActionDefinition } {
@@ -221,6 +222,53 @@ export function getActions(device: Device): { [id in ActionId]: CompanionActionD
 			],
 			callback: (action) => {
 				device.sendCommand(`play/play_snapshot`, 'POST', { snapshot_id: action.options.snapshot_id })
+			},
+		},
+		[ActionId.RecordSnapshot]: {
+			name: 'Trigger recording of a snapshot for a show',
+			options: [
+				{
+					type: 'number',
+					label: 'Show index',
+					id: 'show_idx',
+					tooltip: '1-based show number',
+					default: 1,
+					min: 1,
+					max: 40,
+				},
+				{
+					type: 'textinput',
+					label: 'Snapshot ID',
+					id: 'snapshot_id',
+					default: '1.00',
+					regex: '^d+(.d{1,2})?$',
+					useVariables: true,
+				},
+				{
+					type: 'number',
+					label: 'Fade-in time (ms)',
+					id: 'fade_in_time',
+					default: 2000,
+					min: 0,
+					max: 4294967000,
+				},
+				{
+					type: 'number',
+					label: 'Hold time (ms)',
+					tooltip: 'Time to hold the snapshot at full intensity before fading out. Set to -1 to hold indefinitely.',
+					id: 'hold_time',
+					default: -1,
+					min: -1,
+					max: 2147483000,
+				},
+			],
+			callback: (action) => {
+				const show_idx = Number(action.options.show_idx)
+				device.sendCommand(`play/show/${show_idx - 1}/snapshot/record`, 'POST', {
+					snapshot_id: action.options.snapshot_id,
+					fade_in_time: action.options.fade_in_time,
+					hold_time: action.options.hold_time,
+				})
 			},
 		},
 	}
