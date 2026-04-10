@@ -77,7 +77,7 @@ export class ModuleInstance extends InstanceBase<config> {
 
 	initPresets(): void {
 		if (this.device) {
-			const presets = getPresets()
+			const presets = getPresets(this.device)
 			this.setPresetDefinitions(presets)
 		} else {
 			this.setPresetDefinitions({})
