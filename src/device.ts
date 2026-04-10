@@ -371,7 +371,7 @@ export class Device {
 			})
 			this.log('debug', `Updating DMX port variables: ${this.safeStringify(changedVariables)}`)
 			this.instance.setVariableValues(changedVariables)
-			this.instance.checkFeedbacks(FeedbackId.dmxPortState)
+			this.instance.checkFeedbacks(FeedbackId.dmxPortState, FeedbackId.dmxGlobalState)
 			this.ports = data
 		} else {
 			this.log('debug', `Unhandled command ${cmd}: ${JSON.stringify(data)}`)
@@ -470,7 +470,7 @@ export class Device {
 						if (this.ports[portId] && this.ports[portId].stream_activity_state !== msgValue.value) {
 							this.ports[portId].stream_activity_state = msgValue.value
 							this.instance.setVariableValues({ [`dmx_port_${portId + 1}_stream_activity_state`]: msgValue.value })
-							this.instance.checkFeedbacks(FeedbackId.dmxPortState)
+							this.instance.checkFeedbacks(FeedbackId.dmxPortState, FeedbackId.dmxGlobalState)
 						}
 					}
 				}
