@@ -111,23 +111,25 @@ export function getVariables(device: Device): CompanionVariableDefinition[] {
 					variableId: `processblock_${id}_mode`,
 				})
 				if (device.has_2_8_features) {
-					Array(4)
-						.fill(0)
-						.forEach((_, source_index) => {
-							const source_nr = source_index + 1
-							variables.push({
-								name: `Process Block ${id} source ${source_nr} active`,
-								variableId: `processblock_${id}_source_${source_nr}_active`,
+					if (device.processblock_state_variables == -1 || device.processblock_state_variables > index) {
+						Array(4)
+							.fill(0)
+							.forEach((_, source_index) => {
+								const source_nr = source_index + 1
+								variables.push({
+									name: `Process Block ${id} source ${source_nr} active`,
+									variableId: `processblock_${id}_source_${source_nr}_active`,
+								})
+								variables.push({
+									name: `Process Block ${id} source ${source_nr} IP`,
+									variableId: `processblock_${id}_source_${source_nr}_ip`,
+								})
+								variables.push({
+									name: `Process Block ${id} source ${source_nr} name`,
+									variableId: `processblock_${id}_source_${source_nr}_name`,
+								})
 							})
-							variables.push({
-								name: `Process Block ${id} source ${source_nr} IP`,
-								variableId: `processblock_${id}_source_${source_nr}_ip`,
-							})
-							variables.push({
-								name: `Process Block ${id} source ${source_nr} name`,
-								variableId: `processblock_${id}_source_${source_nr}_name`,
-							})
-						})
+					}
 				}
 			})
 	}

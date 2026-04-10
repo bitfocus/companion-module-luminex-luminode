@@ -26,7 +26,11 @@ export class ModuleInstance extends InstanceBase<config> {
 			}
 			this.device = new Device(this)
 			this.updateStatus(InstanceStatus.Connecting)
-			this.device.setConfig(host, this.config ? this.config.password : '')
+			this.device.setConfig(
+				host,
+				this.config ? this.config.password : '',
+				this.config ? this.config.processblock_state_variables : 1,
+			)
 			this.device.initConnection()
 		} else {
 			await this.device?.destroy()
