@@ -23,6 +23,7 @@ export class Device {
 	active_profile?: string
 	profiles: any[] = []
 	processblocks: any[] = []
+	ports: any[] = []
 	deviceInfo?: any
 	versionInfo?: any
 
@@ -111,22 +112,30 @@ export class Device {
 	}
 
 	/**
-	 * Determine whether this device version supports WebSocket features.
-	 * Returns true for versions >= 2.7.0, false otherwise.
+	 * Parse the current firmware version.
 	 */
-	supportsWs(): boolean {
+	getFwVersion(): [number, number, number] | null {
 		const verRaw = this.versionInfo?.current
-		if (!verRaw || typeof verRaw !== 'string') return false
+		if (!verRaw || typeof verRaw !== 'string') return null
 
 		// Match version at start like: v2.7.1 or 2.7.1 or 2.7.1RC1-...
 		const m = verRaw.match(/^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/)
-		// If no match: assume custom firmware that supports WebSockets
-		if (!m) return true
+		// If no match: assume custom firmware that supports anything (like WebSockets)
+		if (!m) return [9, 9, 9]
 
 		const major = parseInt(m[1] ?? '0', 10)
 		const minor = parseInt(m[2] ?? '0', 10)
 		const patch = parseInt(m[3] ?? '0', 10)
-		if (isNaN(major) || isNaN(minor) || isNaN(patch)) return false
+		if (isNaN(major) || isNaN(minor) || isNaN(patch)) return null
+		return [major, minor, patch]
+	}
+
+	/**
+	 * Determine whether this device version supports WebSocket features.
+	 * Returns true for versions >= 2.7.0, false otherwise.
+	 */
+	supportsWs(): boolean {
+		const [major, minor, patch] = this.getFwVersion() ?? [0, 0, 0]
 
 		// Compare to 2.7.0
 		if (major > 2) return true
@@ -344,6 +353,25 @@ export class Device {
 			this.getPlayInfo()
 		} else if (cmd.startsWith('play/play_snapshot')) {
 			this.getPlayInfo()
+		} else if (cmd.startsWith('dmx/ports')) {
+			if (!Array.isArray(data)) {
+				this.log('debug', `Unexpected DMX ports data: ${this.safeStringify(data)}`)
+				return
+			}
+			const changedVariables: CompanionVariableValues = {}
+			data.forEach((port: any, index: number) => {
+				const id = index + 1
+				const oldPort = this.ports?.[index]
+				if (!oldPort || oldPort?.stream_activity_state !== port.stream_activity_state) {
+					changedVariables[`dmx_port_${id}_stream_activity_state`] = port.stream_activity_state
+				}
+				if (!oldPort || oldPort?.backup_active_dmx_tx !== port.backup_active_dmx_tx) {
+					changedVariables[`dmx_port_${id}_backup_active_dmx_tx`] = port.backup_active_dmx_tx
+				}
+			})
+			this.log('debug', `Updating DMX port variables: ${this.safeStringify(changedVariables)}`)
+			this.instance.setVariableValues(changedVariables)
+			this.ports = data
 		} else {
 			this.log('debug', `Unhandled command ${cmd}: ${JSON.stringify(data)}`)
 		}
@@ -397,6 +425,9 @@ export class Device {
 				this.processData('active_profile_name', msgValue.value.active_profile_name)
 				this.processData('profile', msgValue.value.profile)
 				this.processData('processblock', msgValue.value.processblock)
+				if (msgValue.value.dmx && msgValue.value.dmx.ports) {
+					this.processData('dmx/ports', msgValue.value.dmx.ports)
+				}
 			} else if (msgValue.path === '/api/deviceinfo') {
 				this.processData('deviceinfo', msgValue.value)
 			} else if (msgValue.path === '/api/active_profile_name') {
@@ -414,6 +445,30 @@ export class Device {
 					this.updateProcessblock(pbId, msgValue.value)
 				} else {
 					this.log('debug', `Unhandled processblock WS message: ${msgValue.path} (${msgValue.op})`)
+				}
+			} else if (/^\/api\/dmx\/\d+\/backup_active_dmx_tx$/.test(msgValue.path)) {
+				if (msgValue.op === 'replace') {
+					const match = msgValue.path.match(/^\/api\/dmx\/(\d+)\/backup_active_dmx_tx$/)
+					if (match) {
+						const portId = parseInt(match[1], 10)
+						this.log('debug', `DMX port ${portId + 1} backup_active_dmx_tx changed to ${msgValue.value}`)
+						if (this.ports[portId] && this.ports[portId].backup_active_dmx_tx !== msgValue.value) {
+							this.ports[portId].backup_active_dmx_tx = msgValue.value
+							this.instance.setVariableValues({ [`dmx_port_${portId + 1}_backup_active_dmx_tx`]: msgValue.value })
+						}
+					}
+				}
+			} else if (/^\/api\/dmx\/\d+\/stream_activity_state$/.test(msgValue.path)) {
+				if (msgValue.op === 'replace') {
+					const match = msgValue.path.match(/^\/api\/dmx\/(\d+)\/stream_activity_state$/)
+					if (match) {
+						const portId = parseInt(match[1], 10)
+						this.log('debug', `DMX port ${portId + 1} stream_activity_state changed to ${msgValue.value}`)
+						if (this.ports[portId] && this.ports[portId].stream_activity_state !== msgValue.value) {
+							this.ports[portId].stream_activity_state = msgValue.value
+							this.instance.setVariableValues({ [`dmx_port_${portId + 1}_stream_activity_state`]: msgValue.value })
+						}
+					}
 				}
 			} else {
 				// this.log('debug', `Unhandled WS message: ${msgValue.path}`)
