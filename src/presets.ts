@@ -254,6 +254,34 @@ export function getPresets(): CompanionPresetDefinitions {
 		],
 	}
 
+	presets[`record_snapshot`] = {
+		type: 'button',
+		category: 'Play',
+		name: `Record Snapshot\nRecord a specific snapshot`,
+		style: {
+			text: `Show 1: Record 1.00`,
+			size: 'auto',
+			color: Color.Green,
+			bgcolor: Color.Black,
+		},
+		steps: [
+			{
+				down: [
+					{
+						actionId: ActionId.RecordSnapshot,
+						options: {
+							show_idx: 1,
+							snapshot_id: '1.00',
+							fade_in_time: 2000,
+							hold_time: -1,
+						},
+					},
+				],
+				up: [],
+			},
+		],
+		feedbacks: [],
+	}
 	Array(40)
 		.fill(0)
 		.forEach((_, i) => {
