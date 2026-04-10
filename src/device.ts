@@ -10,6 +10,7 @@ export class Device {
 
 	connected = false
 	use_websockets = false
+	has_2_8_features = false // Set to true if device firmware version is >= 2.8.0. Used to enable/disable features accordingly.
 
 	devicePoll?: NodeJS.Timeout
 	deviceLongPoll?: NodeJS.Timeout
@@ -89,6 +90,8 @@ export class Device {
 									alternate_version: json.alternate,
 								})
 								this.use_websockets = this.supportsWs()
+								const [major, minor, patch] = this.getFwVersion() || [0, 0, 0]
+								this.has_2_8_features = major > 2 || (major === 2 && minor >= 8 && patch >= 0)
 								this.log('debug', `Support for Websockets: ${this.use_websockets}`)
 								this.updateStatus(InstanceStatus.Ok)
 								if (this.use_websockets) {
@@ -346,6 +349,10 @@ export class Device {
 				if (!oldPb || oldPb?.mode !== processblock.mode) {
 					changedVariables[`processblock_${id}_mode`] = processblock.mode
 				}
+				if (processblock.sources) {
+					const moreChangedVars = this.checkProcessblockSources(id, oldPb?.sources?.inputs, processblock.sources.inputs)
+					Object.assign(changedVariables, moreChangedVars)
+				}
 			})
 			this.instance.setVariableValues(changedVariables)
 			this.processblocks = data
@@ -369,7 +376,6 @@ export class Device {
 					changedVariables[`dmx_port_${id}_backup_active_dmx_tx`] = port.backup_active_dmx_tx
 				}
 			})
-			this.log('debug', `Updating DMX port variables: ${this.safeStringify(changedVariables)}`)
 			this.instance.setVariableValues(changedVariables)
 			this.instance.checkFeedbacks(FeedbackId.dmxPortState, FeedbackId.dmxGlobalState)
 			this.ports = data
@@ -400,6 +406,47 @@ export class Device {
 			changedVariables[`processblock_${id + 1}_mode`] = processblock.mode
 		}
 		this.processblocks[id] = processblock
+		this.instance.setVariableValues(changedVariables)
+	}
+
+	// This function uses 1-based pb numbering
+	checkProcessblockSources(
+		pb_id: number,
+		oldSourceInputs: any[] | undefined,
+		sourceInputs: any[],
+	): CompanionVariableValues {
+		const changedVariables: CompanionVariableValues = {}
+		sourceInputs.forEach((source: any, index: number) => {
+			// Possible fields to check: ip, name. If not present: reset to empty string.
+			let oldSource = oldSourceInputs?.[index]
+			// If source is null, it is inactive, else active.
+			if (source === null) {
+				source = { ip: '', name: '', active: false }
+			} else {
+				source.active = true
+			}
+			if (oldSource === null || oldSource === undefined) {
+				oldSource = { ip: '', name: '', active: false }
+			} else {
+				oldSource.active = true
+			}
+			if (!oldSourceInputs || oldSource.ip !== source.ip) {
+				changedVariables[`processblock_${pb_id}_source_${index + 1}_ip`] = source.ip ?? ''
+			}
+			if (!oldSourceInputs || oldSource.name !== source.name) {
+				changedVariables[`processblock_${pb_id}_source_${index + 1}_name`] = source.name ?? ''
+			}
+			if (!oldSourceInputs || oldSource.active !== source.active) {
+				changedVariables[`processblock_${pb_id}_source_${index + 1}_active`] = source.active
+			}
+		})
+		return changedVariables
+	}
+
+	updateProcessblockSourcesInputs(pb_id: number, inputs: any[]): void {
+		const oldPb = this.processblocks?.find(({ processblockId }) => processblockId === pb_id)
+		const changedVariables = this.checkProcessblockSources(pb_id + 1, oldPb?.sources?.inputs, inputs)
+		this.processblocks[pb_id].sources.inputs = inputs
 		this.instance.setVariableValues(changedVariables)
 	}
 
@@ -448,6 +495,11 @@ export class Device {
 					this.updateProcessblock(pbId, msgValue.value)
 				} else {
 					this.log('debug', `Unhandled processblock WS message: ${msgValue.path} (${msgValue.op})`)
+				}
+			} else if (/^\/api\/processblock\/\d+\/sources\/inputs$/.test(msgValue.path)) {
+				if (msgValue.op === 'replace') {
+					const pbId = parseInt(msgValue.path.replace('/api/processblock/', '').replace('/sources/inputs', ''), 10)
+					this.updateProcessblockSourcesInputs(pbId, msgValue.value)
 				}
 			} else if (/^\/api\/dmx\/\d+\/backup_active_dmx_tx$/.test(msgValue.path)) {
 				if (msgValue.op === 'replace') {
