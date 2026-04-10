@@ -339,6 +339,24 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 					],
 				}
 			})
+		presets[`dmx_port_global_state`] = {
+			type: 'button',
+			category: 'DMX Ports',
+			name: `DMX Ports Global State`,
+			style: {
+				text: `DMX Ports state`,
+				size: 'auto',
+				color: Color.White,
+				bgcolor: Color.Black,
+			},
+			steps: [],
+			feedbacks: [
+				{
+					feedbackId: FeedbackId.dmxGlobalState,
+					options: {},
+				},
+			],
+		}
 	}
 
 	return presets

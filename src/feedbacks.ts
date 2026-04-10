@@ -10,6 +10,7 @@ export enum FeedbackId {
 	playingCue = 'playing_cue',
 	nextCue = 'next_cue',
 	dmxPortState = 'dmx_port_state',
+	dmxGlobalState = 'dmx_global_state',
 }
 
 export function getFeedbacks(device: Device): CompanionFeedbackDefinitions {
@@ -99,6 +100,58 @@ export function getFeedbacks(device: Device): CompanionFeedbackDefinitions {
 				} else if (port.stream_activity_state === 'streaming') {
 					return { bgcolor: Color.LightBlue, color: Color.White }
 				} else if (port.stream_activity_state === 'idle') {
+					return { bgcolor: Color.Black, color: Color.LightBlue }
+				} else {
+					return {}
+				}
+			},
+		}
+		feedbacks[FeedbackId.dmxGlobalState] = {
+			type: 'advanced',
+			name: 'DMX global state',
+			description:
+				'Change style based on the state of all DMX ports combined. This will take style based on the "worst" state across all DMX ports.',
+			options: [],
+			callback: (): CompanionAdvancedFeedbackResult => {
+				// Possible states in order of severity: stopped, streaming_continues, recovered, streaming_continues_acknowledged, streaming, idle
+				let worstState = 'idle'
+				if (!device.ports) {
+					return {}
+				}
+				for (const port of device.ports) {
+					if (port.stream_activity_state === 'stopped') {
+						worstState = 'stopped'
+						break
+					} else if (
+						['recovered', 'streaming_continues_acknowledged', 'streaming', 'idle'].includes(worstState) &&
+						port.stream_activity_state === 'streaming_continues'
+					) {
+						worstState = port.stream_activity_state
+					} else if (
+						['streaming_continues_acknowledged', 'streaming', 'idle'].includes(worstState) &&
+						port.stream_activity_state === 'recovered'
+					) {
+						worstState = port.stream_activity_state
+					} else if (
+						['streaming', 'idle'].includes(worstState) &&
+						port.stream_activity_state === 'streaming_continues_acknowledged'
+					) {
+						worstState = port.stream_activity_state
+					} else if (['idle'].includes(worstState) && port.stream_activity_state === 'streaming') {
+						worstState = port.stream_activity_state
+					}
+				}
+				if (worstState === 'stopped') {
+					return { bgcolor: Color.Black, color: Color.Red }
+				} else if (worstState === 'streaming_continues') {
+					return { bgcolor: Color.Red, color: Color.White }
+				} else if (worstState === 'streaming_continues_acknowledged') {
+					return { bgcolor: Color.LightBlue, color: Color.Red }
+				} else if (worstState === 'recovered') {
+					return { bgcolor: Color.Orange, color: Color.White }
+				} else if (worstState === 'streaming') {
+					return { bgcolor: Color.LightBlue, color: Color.White }
+				} else if (worstState === 'idle') {
 					return { bgcolor: Color.Black, color: Color.LightBlue }
 				} else {
 					return {}
