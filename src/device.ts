@@ -355,6 +355,14 @@ export class Device {
 					const moreChangedVars = this.checkProcessblockSources(id, oldPb?.sources?.inputs, processblock.sources.inputs)
 					Object.assign(changedVariables, moreChangedVars)
 				}
+				if (processblock.summarized_active_input) {
+					const moreChangedVars = this.checkProcessblockSummarizedActiveInput(
+						id,
+						oldPb?.summarized_active_input,
+						processblock.summarized_active_input,
+					)
+					Object.assign(changedVariables, moreChangedVars)
+				}
 			})
 			this.instance.setVariableValues(changedVariables)
 			this.processblocks = data
@@ -459,6 +467,39 @@ export class Device {
 		this.instance.setVariableValues(changedVariables)
 	}
 
+	// This function uses 1-based pb numbering
+	checkProcessblockSummarizedActiveInput(
+		pb_id: number,
+		oldActiveInput: number | null | undefined,
+		summarizedActiveInput: number | null,
+	): CompanionVariableValues {
+		const changedVariables: CompanionVariableValues = {}
+		if (this.processblock_state_variables === 0) {
+			// Don't track processblock state variables
+			return changedVariables
+		} else if (this.processblock_state_variables != -1 && pb_id > this.processblock_state_variables) {
+			// Don't track processblock state variables for processblocks above the configured limit
+			return changedVariables
+		}
+		if (oldActiveInput === undefined || oldActiveInput !== summarizedActiveInput) {
+			// Null or convert to 1-based
+			changedVariables[`processblock_${pb_id}_selected_input`] =
+				summarizedActiveInput === null ? undefined : summarizedActiveInput + 1
+		}
+		return changedVariables
+	}
+
+	updateProcessblockSummarizedActiveInput(pb_id: number, summarizedActiveInput: number | null): void {
+		const oldPb = this.processblocks?.find(({ processblockId }) => processblockId === pb_id)
+		const changedVariables = this.checkProcessblockSummarizedActiveInput(
+			pb_id + 1,
+			oldPb?.selected_input,
+			summarizedActiveInput,
+		)
+		this.processblocks[pb_id].selected_input = summarizedActiveInput
+		this.instance.setVariableValues(changedVariables)
+	}
+
 	websocketOpen(): void {
 		this.updateStatus(InstanceStatus.Ok)
 		this.log('debug', `Connection opened to ${this.host}`)
@@ -510,12 +551,19 @@ export class Device {
 					const pbId = parseInt(msgValue.path.replace('/api/processblock/', '').replace('/sources/inputs', ''), 10)
 					this.updateProcessblockSourcesInputs(pbId, msgValue.value)
 				}
+			} else if (/^\/api\/processblock\/\d+\/summarized_active_input$/.test(msgValue.path)) {
+				if (msgValue.op === 'replace') {
+					const pbId = parseInt(
+						msgValue.path.replace('/api/processblock/', '').replace('/summarized_active_input', ''),
+						10,
+					)
+					this.updateProcessblockSummarizedActiveInput(pbId, msgValue.value)
+				}
 			} else if (/^\/api\/dmx\/\d+\/backup_active_dmx_tx$/.test(msgValue.path)) {
 				if (msgValue.op === 'replace') {
 					const match = msgValue.path.match(/^\/api\/dmx\/(\d+)\/backup_active_dmx_tx$/)
 					if (match) {
 						const portId = parseInt(match[1], 10)
-						this.log('debug', `DMX port ${portId + 1} backup_active_dmx_tx changed to ${msgValue.value}`)
 						if (this.ports[portId] && this.ports[portId].backup_active_dmx_tx !== msgValue.value) {
 							this.ports[portId].backup_active_dmx_tx = msgValue.value
 							this.instance.setVariableValues({ [`dmx_port_${portId + 1}_backup_active_dmx_tx`]: msgValue.value })
@@ -527,7 +575,6 @@ export class Device {
 					const match = msgValue.path.match(/^\/api\/dmx\/(\d+)\/stream_activity_state$/)
 					if (match) {
 						const portId = parseInt(match[1], 10)
-						this.log('debug', `DMX port ${portId + 1} stream_activity_state changed to ${msgValue.value}`)
 						if (this.ports[portId] && this.ports[portId].stream_activity_state !== msgValue.value) {
 							this.ports[portId].stream_activity_state = msgValue.value
 							this.instance.setVariableValues({ [`dmx_port_${portId + 1}_stream_activity_state`]: msgValue.value })

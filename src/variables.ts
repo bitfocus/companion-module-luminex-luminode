@@ -112,6 +112,10 @@ export function getVariables(device: Device): CompanionVariableDefinition[] {
 				})
 				if (device.has_2_8_features) {
 					if (device.processblock_state_variables == -1 || device.processblock_state_variables > index) {
+						variables.push({
+							name: `Process Block ${id} selected input`,
+							variableId: `processblock_${id}_selected_input`,
+						})
 						Array(4)
 							.fill(0)
 							.forEach((_, source_index) => {
