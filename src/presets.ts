@@ -1,6 +1,7 @@
 import { ActionId } from './actions.js'
 import { FeedbackId } from './feedbacks.js'
 import * as Color from './colors.js'
+import { Device } from './device.js'
 import { type CompanionButtonPresetDefinition, type CompanionPresetDefinitions } from '@companion-module/base'
 
 interface CompanionPresetExt extends CompanionButtonPresetDefinition {
@@ -26,7 +27,7 @@ interface CompanionPresetDefinitionsExt {
 	[id: string]: CompanionPresetExt | undefined
 }
 
-export function getPresets(): CompanionPresetDefinitions {
+export function getPresets(device: Device): CompanionPresetDefinitions {
 	const presets: CompanionPresetDefinitionsExt = {}
 	presets[`active_profile`] = {
 		type: 'button',
@@ -339,6 +340,34 @@ export function getPresets(): CompanionPresetDefinitions {
 				feedbacks: [],
 			}
 		})
+
+	if (device.use_websockets && device.deviceInfo?.nr_dmx_ports) {
+		Array(device.deviceInfo.nr_dmx_ports)
+			.fill(0)
+			.forEach((_, index) => {
+				const id = index + 1
+				presets[`dmx_port_state_${id}`] = {
+					type: 'button',
+					category: 'DMX Ports',
+					name: `DMX Port ${id} State`,
+					style: {
+						text: `Port ${id}`,
+						size: 'auto',
+						color: Color.White,
+						bgcolor: Color.Black,
+					},
+					steps: [],
+					feedbacks: [
+						{
+							feedbackId: FeedbackId.dmxPortState,
+							options: {
+								port_nr: id,
+							},
+						},
+					],
+				}
+			})
+	}
 
 	return presets
 }
