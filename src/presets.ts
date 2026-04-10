@@ -349,14 +349,26 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 				presets[`dmx_port_state_${id}`] = {
 					type: 'button',
 					category: 'DMX Ports',
-					name: `DMX Port ${id} State`,
+					name: `Indicates the state of DMX Port ${id} and allows to acknowledge stream loss indications for that port`,
 					style: {
 						text: `Port ${id}`,
 						size: 'auto',
 						color: Color.White,
 						bgcolor: Color.Black,
 					},
-					steps: [],
+					steps: [
+						{
+							down: [
+								{
+									actionId: ActionId.DmxAcknowledgePort,
+									options: {
+										port: id,
+									},
+								},
+							],
+							up: [],
+						},
+					],
 					feedbacks: [
 						{
 							feedbackId: FeedbackId.dmxPortState,
@@ -370,14 +382,24 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 		presets[`dmx_port_global_state`] = {
 			type: 'button',
 			category: 'DMX Ports',
-			name: `DMX Ports Global State`,
+			name: `Indicates the global state of all DMX ports combined, based on the 'worst' state among all ports, and allows to acknowledge stream loss indications by pressing the button`,
 			style: {
 				text: `DMX Ports state`,
 				size: 'auto',
 				color: Color.White,
 				bgcolor: Color.Black,
 			},
-			steps: [],
+			steps: [
+				{
+					down: [
+						{
+							actionId: ActionId.DmxAcknowledge,
+							options: {},
+						},
+					],
+					up: [],
+				},
+			],
 			feedbacks: [
 				{
 					feedbackId: FeedbackId.dmxGlobalState,
