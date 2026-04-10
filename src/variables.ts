@@ -113,5 +113,21 @@ export function getVariables(device: Device): CompanionVariableDefinition[] {
 			})
 	}
 
+	if (device.use_websockets && device.deviceInfo?.nr_dmx_ports) {
+		Array(device.deviceInfo.nr_dmx_ports)
+			.fill(0)
+			.forEach((_, index) => {
+				const id = index + 1
+				variables.push({
+					name: `DMX Port ${id} Stream Activity State`,
+					variableId: `dmx_port_${id}_stream_activity_state`,
+				})
+				variables.push({
+					name: `DMX Port ${id} Backup Active DMX TX`,
+					variableId: `dmx_port_${id}_backup_active_dmx_tx`,
+				})
+			})
+	}
+
 	return variables
 }
