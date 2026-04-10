@@ -351,11 +351,11 @@ export class Device {
 				if (!oldPb || oldPb?.mode !== processblock.mode) {
 					changedVariables[`processblock_${id}_mode`] = processblock.mode
 				}
-				if (processblock.sources) {
+				if ('sources' in processblock) {
 					const moreChangedVars = this.checkProcessblockSources(id, oldPb?.sources?.inputs, processblock.sources.inputs)
 					Object.assign(changedVariables, moreChangedVars)
 				}
-				if (processblock.summarized_active_input) {
+				if ('summarized_active_input' in processblock) {
 					const moreChangedVars = this.checkProcessblockSummarizedActiveInput(
 						id,
 						oldPb?.summarized_active_input,
@@ -365,6 +365,7 @@ export class Device {
 				}
 			})
 			this.instance.setVariableValues(changedVariables)
+			this.instance.checkFeedbacks(FeedbackId.pbSelectedInput)
 			this.processblocks = data
 		} else if (cmd.startsWith('play/control')) {
 			this.getPlayInfo()
@@ -484,7 +485,7 @@ export class Device {
 		if (oldActiveInput === undefined || oldActiveInput !== summarizedActiveInput) {
 			// Null or convert to 1-based
 			changedVariables[`processblock_${pb_id}_selected_input`] =
-				summarizedActiveInput === null ? undefined : summarizedActiveInput + 1
+				summarizedActiveInput === null ? undefined : `${summarizedActiveInput + 1}`
 		}
 		return changedVariables
 	}
@@ -493,10 +494,11 @@ export class Device {
 		const oldPb = this.processblocks?.find(({ processblockId }) => processblockId === pb_id)
 		const changedVariables = this.checkProcessblockSummarizedActiveInput(
 			pb_id + 1,
-			oldPb?.selected_input,
+			oldPb?.summarized_active_input,
 			summarizedActiveInput,
 		)
-		this.processblocks[pb_id].selected_input = summarizedActiveInput
+		this.processblocks[pb_id].summarized_active_input = summarizedActiveInput
+		this.instance.checkFeedbacks(FeedbackId.pbSelectedInput)
 		this.instance.setVariableValues(changedVariables)
 	}
 

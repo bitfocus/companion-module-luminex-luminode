@@ -3,6 +3,7 @@ import { combineRgb } from '@companion-module/base'
 export const White = combineRgb(255, 255, 255)
 export const Black = combineRgb(0, 0, 0)
 export const Red = combineRgb(200, 0, 0)
+export const Blue = combineRgb(0, 0, 200)
 export const Yellow = combineRgb(255, 255, 0)
 export const LightYellow = combineRgb(255, 255, 204)
 export const Green = combineRgb(0, 200, 0)

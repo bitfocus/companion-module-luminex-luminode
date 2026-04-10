@@ -11,6 +11,7 @@ export enum FeedbackId {
 	nextCue = 'next_cue',
 	dmxPortState = 'dmx_port_state',
 	dmxGlobalState = 'dmx_global_state',
+	pbSelectedInput = 'pb_selected_input',
 }
 
 export function getFeedbacks(device: Device): CompanionFeedbackDefinitions {
@@ -163,6 +164,58 @@ export function getFeedbacks(device: Device): CompanionFeedbackDefinitions {
 			'debug',
 			`DMX port state feedbacks are not available because the device does not support WebSockets or DMX port information: ${device.use_websockets}, ${device.deviceInfo?.nr_dmx_ports}`,
 		)
+	}
+	if (device.use_websockets && device.has_2_8_features && device.deviceInfo?.nr_processblocks) {
+		feedbacks[FeedbackId.pbSelectedInput] = {
+			type: 'advanced',
+			name: 'Processblock selected input',
+			description:
+				'Shows the currently selected input for a processblock, as a 1-based index. Shows N/A if no input is selected.',
+			options: [
+				{
+					type: 'number',
+					label: 'Processblock ID',
+					id: 'pb_id',
+					default: 1,
+					min: 1,
+					max: device.deviceInfo.nr_processblocks,
+				},
+			],
+			callback: (feedback): CompanionAdvancedFeedbackResult => {
+				const pb_id = Number(feedback.options.pb_id)
+				if (!device.processblocks || pb_id < 1 || pb_id > device.processblocks.length) {
+					return {}
+				}
+				const pb = device.processblocks[pb_id - 1]
+				if (!pb) {
+					return {}
+				}
+				if (pb.summarized_active_input === null || pb.summarized_active_input === undefined) {
+					return { text: `PB${pb_id}: N/A`, bgcolor: Color.Black, color: Color.White }
+				} else if (pb.summarized_active_input === 0) {
+					return {
+						text: `PB${pb_id}: Input ${pb.summarized_active_input + 1}`,
+						bgcolor: Color.Blue,
+						color: Color.White,
+					}
+				} else if (pb.summarized_active_input === 1) {
+					return { text: `PB${pb_id}: Input ${pb.summarized_active_input + 1}`, bgcolor: Color.Red, color: Color.White }
+				} else if (pb.summarized_active_input === 2) {
+					return {
+						text: `PB${pb_id}: Input ${pb.summarized_active_input + 1}`,
+						bgcolor: Color.LightGreen,
+						color: Color.Black,
+					}
+				} else if (pb.summarized_active_input === 3) {
+					return {
+						text: `PB${pb_id}: Input ${pb.summarized_active_input + 1}`,
+						bgcolor: Color.Yellow,
+						color: Color.Black,
+					}
+				}
+				return { text: 'N/A', bgcolor: Color.Black, color: Color.White }
+			},
+		}
 	}
 
 	return feedbacks

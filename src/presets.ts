@@ -7,7 +7,7 @@ import { type CompanionButtonPresetDefinition, type CompanionPresetDefinitions }
 interface CompanionPresetExt extends CompanionButtonPresetDefinition {
 	feedbacks: Array<
 		{
-			feedbackId: FeedbackId
+			feedbackId: FeedbackId | string
 		} & CompanionButtonPresetDefinition['feedbacks'][0]
 	>
 	steps: Array<{
@@ -378,6 +378,38 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 					options: {},
 				},
 			],
+		}
+	}
+
+	if (device.use_websockets && device.has_2_8_features && device.deviceInfo?.nr_processblocks) {
+		if (device.processblock_state_variables == -1 || device.processblock_state_variables > 0) {
+			Array(device.deviceInfo.nr_processblocks)
+				.fill(0)
+				.forEach((_, index) => {
+					if (index < device.processblock_state_variables) {
+						const id = index + 1
+						presets[`processblock_${id}_selected_input`] = {
+							type: 'button',
+							category: 'Process Blocks',
+							name: `Indicates the selected input of process block ${id} when in BACKUP or SWITCH modes`,
+							style: {
+								text: `PB${id}: $(LumiNode:processblock_${id}_selected_input)`,
+								size: 'auto',
+								color: Color.White,
+								bgcolor: Color.Black,
+							},
+							steps: [],
+							feedbacks: [
+								{
+									feedbackId: FeedbackId.pbSelectedInput,
+									options: {
+										pb_id: id,
+									},
+								},
+							],
+						}
+					}
+				})
 		}
 	}
 
