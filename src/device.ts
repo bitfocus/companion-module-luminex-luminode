@@ -6,6 +6,7 @@ import { type CompanionVariableValues, InstanceStatus } from '@companion-module/
 export class Device {
 	host = ''
 	password = ''
+	processblock_state_variables = 0
 	instance: ModuleInstance
 
 	connected = false
@@ -61,9 +62,10 @@ export class Device {
 		this.instance.log(level, message)
 	}
 
-	public setConfig(host: string, password: string): void {
+	public setConfig(host: string, password: string, processblock_state_variables: number): void {
 		this.host = host
 		this.password = password
+		this.processblock_state_variables = processblock_state_variables
 	}
 
 	initConnection(): void {
@@ -416,6 +418,13 @@ export class Device {
 		sourceInputs: any[],
 	): CompanionVariableValues {
 		const changedVariables: CompanionVariableValues = {}
+		if (this.processblock_state_variables === 0) {
+			// Don't track processblock source variables
+			return changedVariables
+		} else if (this.processblock_state_variables != -1 && pb_id > this.processblock_state_variables) {
+			// Don't track processblock source variables for processblocks above the configured limit
+			return changedVariables
+		}
 		sourceInputs.forEach((source: any, index: number) => {
 			// Possible fields to check: ip, name. If not present: reset to empty string.
 			let oldSource = oldSourceInputs?.[index]
