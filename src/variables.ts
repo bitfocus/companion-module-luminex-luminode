@@ -110,6 +110,47 @@ export function getVariables(device: Device): CompanionVariableDefinition[] {
 					name: `Process Block ${id} mode`,
 					variableId: `processblock_${id}_mode`,
 				})
+				if (device.has_2_8_features) {
+					if (device.processblock_state_variables == -1 || device.processblock_state_variables > index) {
+						variables.push({
+							name: `Process Block ${id} selected input`,
+							variableId: `processblock_${id}_selected_input`,
+						})
+						Array(4)
+							.fill(0)
+							.forEach((_, source_index) => {
+								const source_nr = source_index + 1
+								variables.push({
+									name: `Process Block ${id} source ${source_nr} active`,
+									variableId: `processblock_${id}_source_${source_nr}_active`,
+								})
+								variables.push({
+									name: `Process Block ${id} source ${source_nr} IP`,
+									variableId: `processblock_${id}_source_${source_nr}_ip`,
+								})
+								variables.push({
+									name: `Process Block ${id} source ${source_nr} name`,
+									variableId: `processblock_${id}_source_${source_nr}_name`,
+								})
+							})
+					}
+				}
+			})
+	}
+
+	if (device.use_websockets && device.deviceInfo?.nr_dmx_ports) {
+		Array(device.deviceInfo.nr_dmx_ports)
+			.fill(0)
+			.forEach((_, index) => {
+				const id = index + 1
+				variables.push({
+					name: `DMX Port ${id} Stream Activity State`,
+					variableId: `dmx_port_${id}_stream_activity_state`,
+				})
+				variables.push({
+					name: `DMX Port ${id} Backup Active DMX TX`,
+					variableId: `dmx_port_${id}_backup_active_dmx_tx`,
+				})
 			})
 	}
 

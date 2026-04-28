@@ -1,12 +1,13 @@
 import { ActionId } from './actions.js'
 import { FeedbackId } from './feedbacks.js'
 import * as Color from './colors.js'
+import { Device } from './device.js'
 import { type CompanionButtonPresetDefinition, type CompanionPresetDefinitions } from '@companion-module/base'
 
 interface CompanionPresetExt extends CompanionButtonPresetDefinition {
 	feedbacks: Array<
 		{
-			feedbackId: FeedbackId
+			feedbackId: FeedbackId | string
 		} & CompanionButtonPresetDefinition['feedbacks'][0]
 	>
 	steps: Array<{
@@ -26,7 +27,7 @@ interface CompanionPresetDefinitionsExt {
 	[id: string]: CompanionPresetExt | undefined
 }
 
-export function getPresets(): CompanionPresetDefinitions {
+export function getPresets(device: Device): CompanionPresetDefinitions {
 	const presets: CompanionPresetDefinitionsExt = {}
 	presets[`active_profile`] = {
 		type: 'button',
@@ -339,6 +340,106 @@ export function getPresets(): CompanionPresetDefinitions {
 				feedbacks: [],
 			}
 		})
+
+	if (device.use_websockets && device.deviceInfo?.nr_dmx_ports) {
+		Array(device.deviceInfo.nr_dmx_ports)
+			.fill(0)
+			.forEach((_, index) => {
+				const id = index + 1
+				presets[`dmx_port_state_${id}`] = {
+					type: 'button',
+					category: 'DMX Ports',
+					name: `Indicates the state of DMX Port ${id} and allows to acknowledge stream loss indications for that port`,
+					style: {
+						text: `Port ${id}`,
+						size: 'auto',
+						color: Color.White,
+						bgcolor: Color.Black,
+					},
+					steps: [
+						{
+							down: [
+								{
+									actionId: ActionId.DmxAcknowledgePort,
+									options: {
+										port: id,
+									},
+								},
+							],
+							up: [],
+						},
+					],
+					feedbacks: [
+						{
+							feedbackId: FeedbackId.dmxPortState,
+							options: {
+								port_nr: id,
+							},
+						},
+					],
+				}
+			})
+		presets[`dmx_port_global_state`] = {
+			type: 'button',
+			category: 'DMX Ports',
+			name: `Indicates the global state of all DMX ports combined, based on the 'worst' state among all ports, and allows to acknowledge stream loss indications by pressing the button`,
+			style: {
+				text: `DMX Ports state`,
+				size: 'auto',
+				color: Color.White,
+				bgcolor: Color.Black,
+			},
+			steps: [
+				{
+					down: [
+						{
+							actionId: ActionId.DmxAcknowledge,
+							options: {},
+						},
+					],
+					up: [],
+				},
+			],
+			feedbacks: [
+				{
+					feedbackId: FeedbackId.dmxGlobalState,
+					options: {},
+				},
+			],
+		}
+	}
+
+	if (device.use_websockets && device.has_2_8_features && device.deviceInfo?.nr_processblocks) {
+		if (device.processblock_state_variables == -1 || device.processblock_state_variables > 0) {
+			Array(device.deviceInfo.nr_processblocks)
+				.fill(0)
+				.forEach((_, index) => {
+					if (index < device.processblock_state_variables) {
+						const id = index + 1
+						presets[`processblock_${id}_selected_input`] = {
+							type: 'button',
+							category: 'Process Blocks',
+							name: `Indicates the selected input of process block ${id} when in BACKUP or SWITCH modes`,
+							style: {
+								text: `PB${id}: $(LumiNode:processblock_${id}_selected_input)`,
+								size: 'auto',
+								color: Color.White,
+								bgcolor: Color.Black,
+							},
+							steps: [],
+							feedbacks: [
+								{
+									feedbackId: FeedbackId.pbSelectedInput,
+									options: {
+										pb_id: id,
+									},
+								},
+							],
+						}
+					}
+				})
+		}
+	}
 
 	return presets
 }

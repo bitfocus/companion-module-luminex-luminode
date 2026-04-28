@@ -6,10 +6,12 @@ import { type CompanionVariableValues, InstanceStatus } from '@companion-module/
 export class Device {
 	host = ''
 	password = ''
+	processblock_state_variables = 0
 	instance: ModuleInstance
 
 	connected = false
 	use_websockets = false
+	has_2_8_features = false // Set to true if device firmware version is >= 2.8.0. Used to enable/disable features accordingly.
 
 	devicePoll?: NodeJS.Timeout
 	deviceLongPoll?: NodeJS.Timeout
@@ -23,6 +25,7 @@ export class Device {
 	active_profile?: string
 	profiles: any[] = []
 	processblocks: any[] = []
+	ports: any[] = []
 	deviceInfo?: any
 	versionInfo?: any
 
@@ -59,9 +62,10 @@ export class Device {
 		this.instance.log(level, message)
 	}
 
-	public setConfig(host: string, password: string): void {
+	public setConfig(host: string, password: string, processblock_state_variables: number): void {
 		this.host = host
 		this.password = password
+		this.processblock_state_variables = processblock_state_variables
 	}
 
 	initConnection(): void {
@@ -88,6 +92,8 @@ export class Device {
 									alternate_version: json.alternate,
 								})
 								this.use_websockets = this.supportsWs()
+								const [major, minor, patch] = this.getFwVersion() || [0, 0, 0]
+								this.has_2_8_features = major > 2 || (major === 2 && minor >= 8 && patch >= 0)
 								this.log('debug', `Support for Websockets: ${this.use_websockets}`)
 								this.updateStatus(InstanceStatus.Ok)
 								if (this.use_websockets) {
@@ -111,22 +117,30 @@ export class Device {
 	}
 
 	/**
-	 * Determine whether this device version supports WebSocket features.
-	 * Returns true for versions >= 2.7.0, false otherwise.
+	 * Parse the current firmware version.
 	 */
-	supportsWs(): boolean {
+	getFwVersion(): [number, number, number] | null {
 		const verRaw = this.versionInfo?.current
-		if (!verRaw || typeof verRaw !== 'string') return false
+		if (!verRaw || typeof verRaw !== 'string') return null
 
 		// Match version at start like: v2.7.1 or 2.7.1 or 2.7.1RC1-...
 		const m = verRaw.match(/^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/)
-		// If no match: assume custom firmware that supports WebSockets
-		if (!m) return true
+		// If no match: assume custom firmware that supports anything (like WebSockets)
+		if (!m) return [9, 9, 9]
 
 		const major = parseInt(m[1] ?? '0', 10)
 		const minor = parseInt(m[2] ?? '0', 10)
 		const patch = parseInt(m[3] ?? '0', 10)
-		if (isNaN(major) || isNaN(minor) || isNaN(patch)) return false
+		if (isNaN(major) || isNaN(minor) || isNaN(patch)) return null
+		return [major, minor, patch]
+	}
+
+	/**
+	 * Determine whether this device version supports WebSocket features.
+	 * Returns true for versions >= 2.7.0, false otherwise.
+	 */
+	supportsWs(): boolean {
+		const [major, minor, patch] = this.getFwVersion() ?? [0, 0, 0]
 
 		// Compare to 2.7.0
 		if (major > 2) return true
@@ -337,13 +351,45 @@ export class Device {
 				if (!oldPb || oldPb?.mode !== processblock.mode) {
 					changedVariables[`processblock_${id}_mode`] = processblock.mode
 				}
+				if ('sources' in processblock) {
+					const moreChangedVars = this.checkProcessblockSources(id, oldPb?.sources?.inputs, processblock.sources.inputs)
+					Object.assign(changedVariables, moreChangedVars)
+				}
+				if ('summarized_active_input' in processblock) {
+					const moreChangedVars = this.checkProcessblockSummarizedActiveInput(
+						id,
+						oldPb?.summarized_active_input,
+						processblock.summarized_active_input,
+					)
+					Object.assign(changedVariables, moreChangedVars)
+				}
 			})
 			this.instance.setVariableValues(changedVariables)
+			this.instance.checkFeedbacks(FeedbackId.pbSelectedInput)
 			this.processblocks = data
 		} else if (cmd.startsWith('play/control')) {
 			this.getPlayInfo()
 		} else if (cmd.startsWith('play/play_snapshot')) {
 			this.getPlayInfo()
+		} else if (cmd.startsWith('dmx/ports')) {
+			if (!Array.isArray(data)) {
+				this.log('debug', `Unexpected DMX ports data: ${this.safeStringify(data)}`)
+				return
+			}
+			const changedVariables: CompanionVariableValues = {}
+			data.forEach((port: any, index: number) => {
+				const id = index + 1
+				const oldPort = this.ports?.[index]
+				if (!oldPort || oldPort?.stream_activity_state !== port.stream_activity_state) {
+					changedVariables[`dmx_port_${id}_stream_activity_state`] = port.stream_activity_state
+				}
+				if (!oldPort || oldPort?.backup_active_dmx_tx !== port.backup_active_dmx_tx) {
+					changedVariables[`dmx_port_${id}_backup_active_dmx_tx`] = port.backup_active_dmx_tx
+				}
+			})
+			this.instance.setVariableValues(changedVariables)
+			this.instance.checkFeedbacks(FeedbackId.dmxPortState, FeedbackId.dmxGlobalState)
+			this.ports = data
 		} else {
 			this.log('debug', `Unhandled command ${cmd}: ${JSON.stringify(data)}`)
 		}
@@ -374,6 +420,88 @@ export class Device {
 		this.instance.setVariableValues(changedVariables)
 	}
 
+	// This function uses 1-based pb numbering
+	checkProcessblockSources(
+		pb_id: number,
+		oldSourceInputs: any[] | undefined,
+		sourceInputs: any[],
+	): CompanionVariableValues {
+		const changedVariables: CompanionVariableValues = {}
+		if (this.processblock_state_variables === 0) {
+			// Don't track processblock source variables
+			return changedVariables
+		} else if (this.processblock_state_variables != -1 && pb_id > this.processblock_state_variables) {
+			// Don't track processblock source variables for processblocks above the configured limit
+			return changedVariables
+		}
+		sourceInputs.forEach((source: any, index: number) => {
+			// Possible fields to check: ip, name. If not present: reset to empty string.
+			let oldSource = oldSourceInputs?.[index]
+			// If source is null, it is inactive, else active.
+			if (source === null) {
+				source = { ip: '', name: '', active: false }
+			} else {
+				source.active = true
+			}
+			if (oldSource === null || oldSource === undefined) {
+				oldSource = { ip: '', name: '', active: false }
+			} else {
+				oldSource.active = true
+			}
+			if (!oldSourceInputs || oldSource.ip !== source.ip) {
+				changedVariables[`processblock_${pb_id}_source_${index + 1}_ip`] = source.ip ?? ''
+			}
+			if (!oldSourceInputs || oldSource.name !== source.name) {
+				changedVariables[`processblock_${pb_id}_source_${index + 1}_name`] = source.name ?? ''
+			}
+			if (!oldSourceInputs || oldSource.active !== source.active) {
+				changedVariables[`processblock_${pb_id}_source_${index + 1}_active`] = source.active
+			}
+		})
+		return changedVariables
+	}
+
+	updateProcessblockSourcesInputs(pb_id: number, inputs: any[]): void {
+		const oldPb = this.processblocks?.find(({ processblockId }) => processblockId === pb_id)
+		const changedVariables = this.checkProcessblockSources(pb_id + 1, oldPb?.sources?.inputs, inputs)
+		this.processblocks[pb_id].sources.inputs = inputs
+		this.instance.setVariableValues(changedVariables)
+	}
+
+	// This function uses 1-based pb numbering
+	checkProcessblockSummarizedActiveInput(
+		pb_id: number,
+		oldActiveInput: number | null | undefined,
+		summarizedActiveInput: number | null,
+	): CompanionVariableValues {
+		const changedVariables: CompanionVariableValues = {}
+		if (this.processblock_state_variables === 0) {
+			// Don't track processblock state variables
+			return changedVariables
+		} else if (this.processblock_state_variables != -1 && pb_id > this.processblock_state_variables) {
+			// Don't track processblock state variables for processblocks above the configured limit
+			return changedVariables
+		}
+		if (oldActiveInput === undefined || oldActiveInput !== summarizedActiveInput) {
+			// Null or convert to 1-based
+			changedVariables[`processblock_${pb_id}_selected_input`] =
+				summarizedActiveInput === null ? undefined : `${summarizedActiveInput + 1}`
+		}
+		return changedVariables
+	}
+
+	updateProcessblockSummarizedActiveInput(pb_id: number, summarizedActiveInput: number | null): void {
+		const oldPb = this.processblocks?.find(({ processblockId }) => processblockId === pb_id)
+		const changedVariables = this.checkProcessblockSummarizedActiveInput(
+			pb_id + 1,
+			oldPb?.summarized_active_input,
+			summarizedActiveInput,
+		)
+		this.processblocks[pb_id].summarized_active_input = summarizedActiveInput
+		this.instance.checkFeedbacks(FeedbackId.pbSelectedInput)
+		this.instance.setVariableValues(changedVariables)
+	}
+
 	websocketOpen(): void {
 		this.updateStatus(InstanceStatus.Ok)
 		this.log('debug', `Connection opened to ${this.host}`)
@@ -394,9 +522,14 @@ export class Device {
 			if (msgValue.path === '/api') {
 				this.processData('deviceinfo', msgValue.value.deviceinfo)
 				this.instance.initVariables()
+				this.instance.initFeedbacks()
+				this.instance.initPresets()
 				this.processData('active_profile_name', msgValue.value.active_profile_name)
 				this.processData('profile', msgValue.value.profile)
 				this.processData('processblock', msgValue.value.processblock)
+				if (msgValue.value.dmx && msgValue.value.dmx.ports) {
+					this.processData('dmx/ports', msgValue.value.dmx.ports)
+				}
 			} else if (msgValue.path === '/api/deviceinfo') {
 				this.processData('deviceinfo', msgValue.value)
 			} else if (msgValue.path === '/api/active_profile_name') {
@@ -414,6 +547,42 @@ export class Device {
 					this.updateProcessblock(pbId, msgValue.value)
 				} else {
 					this.log('debug', `Unhandled processblock WS message: ${msgValue.path} (${msgValue.op})`)
+				}
+			} else if (/^\/api\/processblock\/\d+\/sources\/inputs$/.test(msgValue.path)) {
+				if (msgValue.op === 'replace') {
+					const pbId = parseInt(msgValue.path.replace('/api/processblock/', '').replace('/sources/inputs', ''), 10)
+					this.updateProcessblockSourcesInputs(pbId, msgValue.value)
+				}
+			} else if (/^\/api\/processblock\/\d+\/summarized_active_input$/.test(msgValue.path)) {
+				if (msgValue.op === 'replace') {
+					const pbId = parseInt(
+						msgValue.path.replace('/api/processblock/', '').replace('/summarized_active_input', ''),
+						10,
+					)
+					this.updateProcessblockSummarizedActiveInput(pbId, msgValue.value)
+				}
+			} else if (/^\/api\/dmx\/\d+\/backup_active_dmx_tx$/.test(msgValue.path)) {
+				if (msgValue.op === 'replace') {
+					const match = msgValue.path.match(/^\/api\/dmx\/(\d+)\/backup_active_dmx_tx$/)
+					if (match) {
+						const portId = parseInt(match[1], 10)
+						if (this.ports[portId] && this.ports[portId].backup_active_dmx_tx !== msgValue.value) {
+							this.ports[portId].backup_active_dmx_tx = msgValue.value
+							this.instance.setVariableValues({ [`dmx_port_${portId + 1}_backup_active_dmx_tx`]: msgValue.value })
+						}
+					}
+				}
+			} else if (/^\/api\/dmx\/\d+\/stream_activity_state$/.test(msgValue.path)) {
+				if (msgValue.op === 'replace') {
+					const match = msgValue.path.match(/^\/api\/dmx\/(\d+)\/stream_activity_state$/)
+					if (match) {
+						const portId = parseInt(match[1], 10)
+						if (this.ports[portId] && this.ports[portId].stream_activity_state !== msgValue.value) {
+							this.ports[portId].stream_activity_state = msgValue.value
+							this.instance.setVariableValues({ [`dmx_port_${portId + 1}_stream_activity_state`]: msgValue.value })
+							this.instance.checkFeedbacks(FeedbackId.dmxPortState, FeedbackId.dmxGlobalState)
+						}
+					}
 				}
 			} else {
 				// this.log('debug', `Unhandled WS message: ${msgValue.path}`)
