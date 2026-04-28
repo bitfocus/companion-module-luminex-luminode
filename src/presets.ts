@@ -2,36 +2,31 @@ import { ActionId } from './actions.js'
 import { FeedbackId } from './feedbacks.js'
 import * as Color from './colors.js'
 import { Device } from './device.js'
-import { type CompanionButtonPresetDefinition, type CompanionPresetDefinitions } from '@companion-module/base'
+import {
+	type CompanionPresetDefinitions,
+	type CompanionPresetSection,
+	type CompanionSimplePresetDefinition,
+} from '@companion-module/base'
 
-interface CompanionPresetExt extends CompanionButtonPresetDefinition {
-	feedbacks: Array<
-		{
-			feedbackId: FeedbackId | string
-		} & CompanionButtonPresetDefinition['feedbacks'][0]
-	>
-	steps: Array<{
-		down: Array<
-			{
-				actionId: ActionId
-			} & CompanionButtonPresetDefinition['steps'][0]['down'][0]
-		>
-		up: Array<
-			{
-				actionId: ActionId
-			} & CompanionButtonPresetDefinition['steps'][0]['up'][0]
-		>
-	}>
-}
-interface CompanionPresetDefinitionsExt {
-	[id: string]: CompanionPresetExt | undefined
-}
+type CompanionPresetCategories = Record<string, string[]>
 
-export function getPresets(device: Device): CompanionPresetDefinitions {
-	const presets: CompanionPresetDefinitionsExt = {}
-	presets[`active_profile`] = {
-		type: 'button',
-		category: 'Profiles',
+export function getPresets(device: Device): {
+	structure: CompanionPresetSection[]
+	presets: CompanionPresetDefinitions
+} {
+	const presets: CompanionPresetDefinitions = {}
+	const categories: CompanionPresetCategories = {}
+
+	const addPreset = (id: string, category: string, preset: CompanionSimplePresetDefinition) => {
+		presets[id] = preset
+		if (!categories[category]) {
+			categories[category] = []
+		}
+		categories[category].push(id)
+	}
+
+	addPreset(`active_profile`, 'Profiles', {
+		type: 'simple',
 		name: `Active Profile Name\nEmpty if no profile active`,
 		style: {
 			text: `$(GigaCore:active_profile_name)`,
@@ -51,11 +46,10 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 			},
 		],
 		feedbacks: [],
-	}
+	})
 
-	presets[`reboot`] = {
-		type: 'button',
-		category: 'Device',
+	addPreset(`reboot`, 'Device', {
+		type: 'simple',
 		name: `Reboot device`,
 		style: {
 			text: `Reboot\n$(Luminode:short_name)`,
@@ -75,11 +69,10 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 			},
 		],
 		feedbacks: [],
-	}
+	})
 
-	presets[`reset`] = {
-		type: 'button',
-		category: 'Device',
+	addPreset(`reset`, 'Device', {
+		type: 'simple',
 		name: `Reset device`,
 		style: {
 			text: `Reset\n$(Luminode:short_name)`,
@@ -102,11 +95,10 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 			},
 		],
 		feedbacks: [],
-	}
+	})
 
-	presets[`play_reset`] = {
-		type: 'button',
-		category: 'Play',
+	addPreset(`play_reset`, 'Play', {
+		type: 'simple',
 		name: `Play Reset\nReset player to first cue`,
 		style: {
 			text: `Reset`,
@@ -128,11 +120,10 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 			},
 		],
 		feedbacks: [],
-	}
+	})
 
-	presets[`play_back`] = {
-		type: 'button',
-		category: 'Play',
+	addPreset(`play_back`, 'Play', {
+		type: 'simple',
 		name: `Play Back\nMove next Cue back`,
 		style: {
 			text: `Back`,
@@ -154,11 +145,10 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 			},
 		],
 		feedbacks: [],
-	}
+	})
 
-	presets[`play_forward`] = {
-		type: 'button',
-		category: 'Play',
+	addPreset(`play_forward`, 'Play', {
+		type: 'simple',
 		name: `Play Forward\nMove next Cue forward`,
 		style: {
 			text: `Next`,
@@ -180,11 +170,10 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 			},
 		],
 		feedbacks: [],
-	}
+	})
 
-	presets[`play_go`] = {
-		type: 'button',
-		category: 'Play',
+	addPreset(`play_go`, 'Play', {
+		type: 'simple',
 		name: `Play Go\nPlay next cue`,
 		style: {
 			text: `Play`,
@@ -206,11 +195,10 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 			},
 		],
 		feedbacks: [],
-	}
+	})
 
-	presets[`play_snapshot`] = {
-		type: 'button',
-		category: 'Play',
+	addPreset(`play_snapshot`, 'Play', {
+		type: 'simple',
 		name: `Play Snapshot\nPlay a specific snapshot. Button will become RED if snapshot is playing`,
 		style: {
 			text: `Play 1.00`,
@@ -253,11 +241,10 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 				},
 			},
 		],
-	}
+	})
 
-	presets[`record_snapshot`] = {
-		type: 'button',
-		category: 'Play',
+	addPreset(`record_snapshot`, 'Play', {
+		type: 'simple',
 		name: `Record Snapshot\nRecord a specific snapshot`,
 		style: {
 			text: `Show 1: Record 1.00`,
@@ -282,14 +269,14 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 			},
 		],
 		feedbacks: [],
-	}
+	})
+
 	Array(40)
 		.fill(0)
 		.forEach((_, i) => {
 			const id = i + 1
-			presets[`recall_profile_${id}`] = {
-				type: 'button',
-				category: 'Profiles',
+			addPreset(`recall_profile_${id}`, 'Profiles', {
+				type: 'simple',
 				name: `Profile ${id} name\nIncludes Name`,
 				style: {
 					text: `Recall $(LumiNode:profile_${id}_name)`,
@@ -312,10 +299,9 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 					},
 				],
 				feedbacks: [],
-			}
-			presets[`save_profile_${id}`] = {
-				type: 'button',
-				category: 'Profiles',
+			})
+			addPreset(`save_profile_${id}`, 'Profiles', {
+				type: 'simple',
 				name: `Save to profile ${id}`,
 				style: {
 					text: `Save to profile ${id}`,
@@ -338,7 +324,7 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 					},
 				],
 				feedbacks: [],
-			}
+			})
 		})
 
 	if (device.use_websockets && device.deviceInfo?.nr_dmx_ports) {
@@ -346,9 +332,8 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 			.fill(0)
 			.forEach((_, index) => {
 				const id = index + 1
-				presets[`dmx_port_state_${id}`] = {
-					type: 'button',
-					category: 'DMX Ports',
+				addPreset(`dmx_port_state_${id}`, 'DMX Ports', {
+					type: 'simple',
 					name: `Indicates the state of DMX Port ${id} and allows to acknowledge stream loss indications for that port`,
 					style: {
 						text: `Port ${id}`,
@@ -377,11 +362,10 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 							},
 						},
 					],
-				}
+				})
 			})
-		presets[`dmx_port_global_state`] = {
-			type: 'button',
-			category: 'DMX Ports',
+		addPreset(`dmx_port_global_state`, 'DMX Ports', {
+			type: 'simple',
 			name: `Indicates the global state of all DMX ports combined, based on the 'worst' state among all ports, and allows to acknowledge stream loss indications by pressing the button`,
 			style: {
 				text: `DMX Ports state`,
@@ -406,7 +390,7 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 					options: {},
 				},
 			],
-		}
+		})
 	}
 
 	if (device.use_websockets && device.has_2_8_features && device.deviceInfo?.nr_processblocks) {
@@ -416,9 +400,8 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 				.forEach((_, index) => {
 					if (index < device.processblock_state_variables) {
 						const id = index + 1
-						presets[`processblock_${id}_selected_input`] = {
-							type: 'button',
-							category: 'Process Blocks',
+						addPreset(`processblock_${id}_selected_input`, 'Process Blocks', {
+							type: 'simple',
 							name: `Indicates the selected input of process block ${id} when in BACKUP or SWITCH modes`,
 							style: {
 								text: `PB${id}: $(LumiNode:processblock_${id}_selected_input)`,
@@ -435,11 +418,17 @@ export function getPresets(device: Device): CompanionPresetDefinitions {
 									},
 								},
 							],
-						}
+						})
 					}
 				})
 		}
 	}
 
-	return presets
+	const structure: CompanionPresetSection[] = Object.entries(categories).map(([category, ids]) => ({
+		id: category.toLowerCase().replace(/\s+/g, '_'),
+		name: category,
+		definitions: ids,
+	}))
+
+	return { structure, presets }
 }

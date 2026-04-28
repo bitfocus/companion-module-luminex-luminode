@@ -1,9 +1,11 @@
 {
+	"$schema": "../node_modules/@companion-module/base/assets/manifest.schema.json",
 	"id": "luminex-luminode",
 	"name": "luminex-luminode",
 	"shortname": "LumiNode",
 	"description": "Interaction with Luminex LumiNode and LumiCore devices.",
-	"version": "1.2.0",
+	"type": "connection",
+	"version": "2.0.0",
 	"license": "MIT",
 	"repository": "git+https://github.com/bitfocus/companion-module-luminex-luminode.git",
 	"bugs": "https://github.com/bitfocus/companion-module-luminex-luminode/issues",
