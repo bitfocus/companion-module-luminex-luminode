@@ -1,4 +1,4 @@
-import { ModuleInstance } from './main.js'
+import ModuleInstance from './main.js'
 import { FeedbackId } from './feedbacks.js'
 import { WS } from './websocket.js'
 import { type CompanionVariableValues, InstanceStatus } from '@companion-module/base'

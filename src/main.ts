@@ -1,4 +1,4 @@
-import { InstanceBase, InstanceStatus, runEntrypoint, type SomeCompanionConfigField } from '@companion-module/base'
+import { InstanceBase, InstanceStatus, type InstanceTypes, type SomeCompanionConfigField } from '@companion-module/base'
 import { type config, getConfigFields } from './config.js'
 import { getActions } from './actions.js'
 import { getPresets } from './presets.js'
@@ -7,7 +7,11 @@ import { getFeedbacks } from './feedbacks.js'
 import { upgradeScripts } from './upgrades.js'
 import { Device } from './device.js'
 
-export class ModuleInstance extends InstanceBase<config> {
+export interface ModuleInstanceTypes extends InstanceTypes {
+	config: config
+}
+
+export default class ModuleInstance extends InstanceBase<ModuleInstanceTypes> {
 	config: config | undefined
 	public device?: Device
 
@@ -66,7 +70,7 @@ export class ModuleInstance extends InstanceBase<config> {
 			const variables = getVariables(this.device)
 			this.setVariableDefinitions(variables)
 		} else {
-			this.setVariableDefinitions([])
+			this.setVariableDefinitions({})
 		}
 	}
 
@@ -82,9 +86,9 @@ export class ModuleInstance extends InstanceBase<config> {
 	initPresets(): void {
 		if (this.device) {
 			const presets = getPresets(this.device)
-			this.setPresetDefinitions(presets)
+			this.setPresetDefinitions(presets.structure, presets.presets)
 		} else {
-			this.setPresetDefinitions({})
+			this.setPresetDefinitions([], {})
 		}
 	}
 
@@ -116,4 +120,4 @@ export class ModuleInstance extends InstanceBase<config> {
 	}
 }
 
-runEntrypoint(ModuleInstance, upgradeScripts)
+export const UpgradeScripts = upgradeScripts
