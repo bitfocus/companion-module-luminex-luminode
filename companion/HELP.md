@@ -32,6 +32,7 @@ Play:
 
 - Play Control: `go`, `forward`, `back` and `reset`
 - Play a specific snapshot
+- Record a specific snapshot
 
 ### Feedbacks implemented
 
@@ -53,6 +54,7 @@ Play:
 - Play Forward. Move next cue forward.
 - Play Go. Play next cue.
 - Play Snapshot. Play a specific snapshot. Button will become RED if snapshot is playing, orange when staged as the next cue.
+- Record snapshot. Record a specific snapshot for a show.
 
 Profiles:
 
