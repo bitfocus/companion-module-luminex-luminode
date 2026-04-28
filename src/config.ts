@@ -1,7 +1,7 @@
 import { InstanceBase, type SomeCompanionConfigField } from '@companion-module/base'
 
 export interface config {
-	bonjour_host: string
+	luminode_host: string
 	host: string
 	password: string
 }
@@ -27,14 +27,6 @@ export const getConfigFields = (): SomeCompanionConfigField[] => {
 			label: 'LumiNode IP',
 			isVisible: (options) => !options['luminode_host'],
 			width: 6,
-		},
-		{
-			type: 'static-text',
-			id: 'luminode-filler',
-			width: 6,
-			label: '',
-			isVisible: (options) => !!options['luminode_host'],
-			value: '',
 		},
 		{
 			type: 'textinput',

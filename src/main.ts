@@ -97,8 +97,8 @@ export class ModuleInstance extends InstanceBase<config> {
 		if (!this.config) {
 			return null
 		}
-		if (this.config.bonjour_host) {
-			const ip = this.config.bonjour_host.split(':')[0]
+		if (this.config.luminode_host) {
+			const ip = this.config.luminode_host.split(':')[0]
 			const regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/
 			if (ip.match(regex)) {
 				return ip
