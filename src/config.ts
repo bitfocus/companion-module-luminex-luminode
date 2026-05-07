@@ -1,10 +1,10 @@
 import { InstanceBase, type SomeCompanionConfigField } from '@companion-module/base'
 
 export interface config {
-	luminode_host: string
-	host: string
-	password: string
-	processblock_state_variables: number
+	luminode_host?: string
+	host?: string
+	password?: string
+	processblock_state_variables?: number
 }
 
 export interface InstanceBaseExt<TConfig> extends InstanceBase<TConfig> {

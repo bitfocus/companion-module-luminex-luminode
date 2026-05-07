@@ -62,10 +62,10 @@ export class Device {
 		this.instance.log(level, message)
 	}
 
-	public setConfig(host: string, password: string, processblock_state_variables: number): void {
+	public setConfig(host: string, password: string | undefined, processblock_state_variables: number | undefined): void {
 		this.host = host
-		this.password = password
-		this.processblock_state_variables = processblock_state_variables
+		this.password = password ?? ''
+		this.processblock_state_variables = processblock_state_variables ?? 1
 	}
 
 	initConnection(): void {

@@ -1,13 +1,21 @@
-export const upgradeScripts = [
+import type { CompanionStaticUpgradeScript, CompanionStaticUpgradeResult } from '@companion-module/base'
+import type { config } from './config.js'
+
+export const upgradeScripts: CompanionStaticUpgradeScript<config>[] = [
 	/*
-	 * Place your upgrade scripts here
-	 * Remember that once it has been added it cannot be removed!
+	 * Upgrade script to add processblock_state_variables config option with default value 1 for all existing instances
+	 * This is needed because this option was added in a later version and without this upgrade script,
+	 * existing instances would not have this option set and thus would not create any process block state variables
 	 */
-	// function (context, props) {
-	// 	return {
-	// 		updatedConfig: null,
-	// 		updatedActions: [],
-	// 		updatedFeedbacks: [],
-	// 	}
-	// },
+	((_context, props): CompanionStaticUpgradeResult<config> => {
+		return {
+			updatedConfig: {
+				...props.config,
+				processblock_state_variables: props.config?.processblock_state_variables ?? 1,
+			},
+			updatedSecrets: null,
+			updatedActions: [],
+			updatedFeedbacks: [],
+		}
+	}) as CompanionStaticUpgradeScript<config>,
 ]
