@@ -1,10 +1,14 @@
 import { type SomeCompanionConfigField } from '@companion-module/base'
 
 export interface config {
-	luminode_host: string
-	host: string
-	password: string
-	processblock_state_variables: number
+	luminode_host?: string
+	host?: string
+	processblock_state_variables?: number
+	[key: string]: any
+}
+
+export interface secrets {
+	password?: string
 	[key: string]: any
 }
 
@@ -24,7 +28,7 @@ export const getConfigFields = (): SomeCompanionConfigField[] => {
 			width: 6,
 		},
 		{
-			type: 'textinput',
+			type: 'secret-text',
 			id: 'password',
 			label: 'Password',
 			tooltip: 'Only provide a password when authentication is enabled on the device',

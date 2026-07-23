@@ -32,9 +32,11 @@ export class WS {
 	callbacks: WsCallbacks
 
 	host: string
-	constructor(host: string, callbacks: WsCallbacks) {
+	getAuthHeader?: () => string | undefined
+	constructor(host: string, callbacks: WsCallbacks, getAuthHeader?: () => string | undefined) {
 		this.host = host
 		this.callbacks = callbacks
+		this.getAuthHeader = getAuthHeader
 	}
 
 	private safeStringify(value: unknown): string {
@@ -60,7 +62,9 @@ export class WS {
 			this.ws.close(1000)
 			delete this.ws
 		}
-		this.ws = new WebSocket(url, ['luminex-luminode-v1-json'])
+		const authHeader = this.getAuthHeader?.()
+		const options = authHeader ? { headers: { Authorization: authHeader } } : undefined
+		this.ws = new WebSocket(url, ['luminex-luminode-v1-json'], options)
 
 		// Use event listeners which are the standard for the Node 'ws' package.
 		// Keep the onXXX fallback for environments that expect it.

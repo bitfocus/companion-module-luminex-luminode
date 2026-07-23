@@ -62,18 +62,25 @@ export class Device {
 		this.instance.log(level, message)
 	}
 
-	public setConfig(host: string, password: string, processblock_state_variables: number): void {
+	public setConfig(host: string, password: string | undefined, processblock_state_variables: number | undefined): void {
 		this.host = host
-		this.password = password
-		this.processblock_state_variables = processblock_state_variables
+		this.password = password ?? ''
+		this.processblock_state_variables = processblock_state_variables ?? 1
+	}
+
+	/** Basic auth header for the device, or undefined when no password is set. */
+	private authHeader(): string | undefined {
+		if (this.password === '') return undefined
+		return `Basic ${Buffer.from(`admin:${this.password}`).toString('base64')}`
 	}
 
 	initConnection(): void {
 		this.stopDevicePoll()
 		const requestHeaders = new Headers()
 		requestHeaders.set('Content-Type', 'application/json')
-		if (this.password !== '') {
-			requestHeaders.set('Authorization', `Basic ${Buffer.from('admin:' + this.password).toString('base64')}`)
+		const authHeader = this.authHeader()
+		if (authHeader) {
+			requestHeaders.set('Authorization', authHeader)
 		}
 		const options = {
 			headers: requestHeaders,
@@ -158,12 +165,16 @@ export class Device {
 			this.ws.close()
 			delete this.ws
 		}
-		this.ws = new WS(this.host, {
-			onopen: this.websocketOpen.bind(this),
-			onmessage: this.websocketMessage.bind(this),
-			onerror: this.websocketError.bind(this),
-			ondisconnect: this.websocketDisconnect.bind(this),
-		})
+		this.ws = new WS(
+			this.host,
+			{
+				onopen: this.websocketOpen.bind(this),
+				onmessage: this.websocketMessage.bind(this),
+				onerror: this.websocketError.bind(this),
+				ondisconnect: this.websocketDisconnect.bind(this),
+			},
+			() => this.authHeader(),
+		)
 	}
 
 	initWebSocket(): void {
@@ -237,8 +248,9 @@ export class Device {
 		const url = `http://${this.host}/api/${cmd}`
 		const requestHeaders = new Headers()
 		requestHeaders.set('Content-Type', 'application/json')
-		if (this.password !== '') {
-			requestHeaders.set('Authorization', `Basic ${Buffer.from('admin:' + this.password).toString('base64')}`)
+		const authHeader = this.authHeader()
+		if (authHeader) {
+			requestHeaders.set('Authorization', authHeader)
 		}
 		const options = {
 			method: type,
