@@ -3,8 +3,11 @@ import { InstanceBase, type SomeCompanionConfigField } from '@companion-module/b
 export interface config {
 	luminode_host?: string
 	host?: string
-	password?: string
 	processblock_state_variables?: number
+}
+
+export interface secrets {
+	password?: string
 }
 
 export interface InstanceBaseExt<TConfig> extends InstanceBase<TConfig> {
@@ -30,7 +33,7 @@ export const getConfigFields = (): SomeCompanionConfigField[] => {
 			width: 6,
 		},
 		{
-			type: 'textinput',
+			type: 'secret-text',
 			id: 'password',
 			label: 'Password',
 			tooltip: 'Only provide a password when authentication is enabled on the device',
