@@ -394,34 +394,32 @@ export function getPresets(device: Device): {
 	}
 
 	if (device.use_websockets && device.has_2_8_features && device.deviceInfo?.nr_processblocks) {
-		if (device.processblock_state_variables == -1 || device.processblock_state_variables > 0) {
-			Array(device.deviceInfo.nr_processblocks)
-				.fill(0)
-				.forEach((_, index) => {
-					if (index < device.processblock_state_variables) {
-						const id = index + 1
-						addPreset(`processblock_${id}_selected_input`, 'Process Blocks', {
-							type: 'simple',
-							name: `Indicates the selected input of process block ${id} when in BACKUP or SWITCH modes`,
-							style: {
-								text: `PB${id}: $(LumiNode:processblock_${id}_selected_input)`,
-								size: 'auto',
-								color: Color.White,
-								bgcolor: Color.Black,
-							},
-							steps: [],
-							feedbacks: [
-								{
-									feedbackId: FeedbackId.pbSelectedInput,
-									options: {
-										pb_id: id,
-									},
+		Array(device.deviceInfo.nr_processblocks)
+			.fill(0)
+			.forEach((_, index) => {
+				if (device.tracksProcessblockState(index)) {
+					const id = index + 1
+					addPreset(`processblock_${id}_selected_input`, 'Process Blocks', {
+						type: 'simple',
+						name: `Indicates the selected input of process block ${id} when in BACKUP or SWITCH modes`,
+						style: {
+							text: `PB${id}: $(LumiNode:processblock_${id}_selected_input)`,
+							size: 'auto',
+							color: Color.White,
+							bgcolor: Color.Black,
+						},
+						steps: [],
+						feedbacks: [
+							{
+								feedbackId: FeedbackId.pbSelectedInput,
+								options: {
+									pb_id: id,
 								},
-							],
-						})
-					}
-				})
-		}
+							},
+						],
+					})
+				}
+			})
 	}
 
 	const structure: CompanionPresetSection[] = Object.entries(categories).map(([category, ids]) => ({

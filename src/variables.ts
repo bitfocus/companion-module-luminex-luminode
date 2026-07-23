@@ -91,7 +91,7 @@ export function getVariables(device: Device): CompanionVariableDefinitions {
 					name: `Process Block ${id} mode`,
 				}
 				if (device.has_2_8_features) {
-					if (device.processblock_state_variables == -1 || device.processblock_state_variables > index) {
+					if (device.tracksProcessblockState(index)) {
 						variables[`processblock_${id}_selected_input`] = {
 							name: `Process Block ${id} selected input`,
 						}
