@@ -158,12 +158,18 @@ export class Device {
 			this.ws.close()
 			delete this.ws
 		}
-		this.ws = new WS(this.host, {
-			onopen: this.websocketOpen.bind(this),
-			onmessage: this.websocketMessage.bind(this),
-			onerror: this.websocketError.bind(this),
-			ondisconnect: this.websocketDisconnect.bind(this),
-		})
+		const authHeader =
+			this.password !== '' ? `Basic ${Buffer.from('admin:' + this.password).toString('base64')}` : undefined
+		this.ws = new WS(
+			this.host,
+			{
+				onopen: this.websocketOpen.bind(this),
+				onmessage: this.websocketMessage.bind(this),
+				onerror: this.websocketError.bind(this),
+				ondisconnect: this.websocketDisconnect.bind(this),
+			},
+			authHeader,
+		)
 	}
 
 	initWebSocket(): void {
