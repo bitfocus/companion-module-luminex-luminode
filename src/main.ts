@@ -88,8 +88,8 @@ export default class ModuleInstance extends InstanceBase<ModuleInstanceTypes> {
 
 	initPresets(): void {
 		if (this.device) {
-			const presets = getPresets(this.device)
-			this.setPresetDefinitions(presets.structure, presets.presets)
+			const { structure, presets } = getPresets(this.device)
+			this.setPresetDefinitions(structure, presets)
 		} else {
 			this.setPresetDefinitions([], {})
 		}

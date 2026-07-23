@@ -1,15 +1,13 @@
 import { type SomeCompanionConfigField } from '@companion-module/base'
 
-export interface config {
+export type config = {
 	luminode_host?: string
 	host?: string
 	processblock_state_variables?: number
-	[key: string]: any
 }
 
-export interface secrets {
+export type secrets = {
 	password?: string
-	[key: string]: any
 }
 
 export const getConfigFields = (): SomeCompanionConfigField[] => {
