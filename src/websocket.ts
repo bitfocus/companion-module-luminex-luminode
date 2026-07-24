@@ -182,7 +182,7 @@ export class WS {
 	}
 
 	messageReceivedFromWebSocket(event: WebSocket.MessageEvent): void {
-		let msgValue = null
+		let msgValue: any
 		try {
 			msgValue = JSON.parse(this.safeStringify(event.data))
 		} catch (_) {
