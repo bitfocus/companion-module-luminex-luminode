@@ -1,0 +1,3 @@
+# Normalize line endings: store as LF in the repo, check out LF on all platforms.
+# Keeps prettier (endOfLine: lf) from flagging CRLF on Windows checkouts.
+* text=auto eol=lf

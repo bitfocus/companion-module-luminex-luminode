@@ -1,4 +1,4 @@
-import { ModuleInstance } from './main.js'
+import ModuleInstance from './main.js'
 import { FeedbackId } from './feedbacks.js'
 import { WS } from './websocket.js'
 import { type CompanionVariableValues, InstanceStatus } from '@companion-module/base'
@@ -66,6 +66,14 @@ export class Device {
 		this.host = host
 		this.password = password ?? ''
 		this.processblock_state_variables = processblock_state_variables ?? 1
+	}
+
+	/**
+	 * Whether processblock state variables/presets should be tracked for the given 0-based processblock index.
+	 * `processblock_state_variables` is the configured limit: 0 disables, -1 tracks all, N tracks the first N.
+	 */
+	tracksProcessblockState(index: number): boolean {
+		return this.processblock_state_variables === -1 || index < this.processblock_state_variables
 	}
 
 	/** Basic auth header for the device, or undefined when no password is set. */
@@ -439,11 +447,8 @@ export class Device {
 		sourceInputs: any[],
 	): CompanionVariableValues {
 		const changedVariables: CompanionVariableValues = {}
-		if (this.processblock_state_variables === 0) {
-			// Don't track processblock source variables
-			return changedVariables
-		} else if (this.processblock_state_variables != -1 && pb_id > this.processblock_state_variables) {
-			// Don't track processblock source variables for processblocks above the configured limit
+		if (!this.tracksProcessblockState(pb_id - 1)) {
+			// Don't track processblock source variables beyond the configured limit
 			return changedVariables
 		}
 		sourceInputs.forEach((source: any, index: number) => {
@@ -487,11 +492,8 @@ export class Device {
 		summarizedActiveInput: number | null,
 	): CompanionVariableValues {
 		const changedVariables: CompanionVariableValues = {}
-		if (this.processblock_state_variables === 0) {
-			// Don't track processblock state variables
-			return changedVariables
-		} else if (this.processblock_state_variables != -1 && pb_id > this.processblock_state_variables) {
-			// Don't track processblock state variables for processblocks above the configured limit
+		if (!this.tracksProcessblockState(pb_id - 1)) {
+			// Don't track processblock state variables beyond the configured limit
 			return changedVariables
 		}
 		if (oldActiveInput === undefined || oldActiveInput !== summarizedActiveInput) {

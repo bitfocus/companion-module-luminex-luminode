@@ -134,7 +134,7 @@ export function getActions(device: Device): { [id in ActionId]: CompanionActionD
 				}
 				const profile = Number(action.options.profile)
 				device.sendCommand(`profile/${profile - 1}/save`, 'POST', {
-					name: action.options.name.toString(),
+					name: action.options.name,
 				})
 			},
 		},

@@ -1,20 +1,13 @@
-import { InstanceBase, type SomeCompanionConfigField } from '@companion-module/base'
+import { type SomeCompanionConfigField } from '@companion-module/base'
 
-export interface config {
+export type config = {
 	luminode_host?: string
 	host?: string
 	processblock_state_variables?: number
 }
 
-export interface secrets {
+export type secrets = {
 	password?: string
-}
-
-export interface InstanceBaseExt<TConfig> extends InstanceBase<TConfig> {
-	[x: string]: any
-	config: TConfig
-	UpdateVariablesValues(): void
-	InitVariables(): void
 }
 
 export const getConfigFields = (): SomeCompanionConfigField[] => {
@@ -29,7 +22,7 @@ export const getConfigFields = (): SomeCompanionConfigField[] => {
 			type: 'textinput',
 			id: 'host',
 			label: 'LumiNode IP',
-			isVisible: (options) => !options['luminode_host'],
+			isVisibleExpression: '!$(options:luminode_host)',
 			width: 6,
 		},
 		{
