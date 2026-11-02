@@ -1,9 +1,5 @@
 import * as Color from './colors.js'
-import {
-	type CompanionFeedbackDefinition,
-	type CompanionFeedbackDefinitions,
-	type CompanionAdvancedFeedbackResult,
-} from '@companion-module/base'
+import { type CompanionFeedbackDefinitions, type CompanionAdvancedFeedbackResult } from '@companion-module/base'
 import { Device } from './device.js'
 
 export enum FeedbackId {
@@ -14,8 +10,22 @@ export enum FeedbackId {
 	pbSelectedInput = 'pb_selected_input',
 }
 
-export function getFeedbacks(device: Device): CompanionFeedbackDefinitions {
-	const feedbacks: { [id: string]: CompanionFeedbackDefinition | undefined } = {}
+export type FeedbackSchemas = {
+	[FeedbackId.playingCue]: { type: 'boolean'; options: { snapshot_id: string } }
+	[FeedbackId.nextCue]: { type: 'boolean'; options: { snapshot_id: string } }
+	[FeedbackId.dmxPortState]: { type: 'advanced'; options: { port_nr: number } }
+	[FeedbackId.dmxGlobalState]: { type: 'advanced'; options: Record<string, never> }
+	[FeedbackId.pbSelectedInput]: { type: 'advanced'; options: { pb_id: number } }
+}
+
+export function getFeedbacks(device: Device): CompanionFeedbackDefinitions<FeedbackSchemas> {
+	const feedbacks: CompanionFeedbackDefinitions<FeedbackSchemas> = {
+		[FeedbackId.playingCue]: undefined,
+		[FeedbackId.nextCue]: undefined,
+		[FeedbackId.dmxPortState]: undefined,
+		[FeedbackId.dmxGlobalState]: undefined,
+		[FeedbackId.pbSelectedInput]: undefined,
+	}
 
 	feedbacks[FeedbackId.playingCue] = {
 		type: 'boolean',
