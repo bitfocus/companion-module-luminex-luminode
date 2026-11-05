@@ -2,5 +2,9 @@ node_modules/
 package-lock.json
 /pkg
 /pkg.tgz
+/*.tgz
+/dist
 dist/
-.yarn/install-state.gz
+DEBUG-*
+/.yarn
+/.vscode

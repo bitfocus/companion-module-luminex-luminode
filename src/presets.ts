@@ -2,6 +2,7 @@ import { ActionId } from './actions.js'
 import { FeedbackId } from './feedbacks.js'
 import * as Color from './colors.js'
 import { Device } from './device.js'
+import type { ModuleInstanceTypes } from './main.js'
 import {
 	type CompanionPresetDefinitions,
 	type CompanionPresetSection,
@@ -11,13 +12,13 @@ import {
 type CompanionPresetCategories = Record<string, string[]>
 
 export function getPresets(device: Device): {
-	structure: CompanionPresetSection[]
-	presets: CompanionPresetDefinitions
+	structure: CompanionPresetSection<ModuleInstanceTypes>[]
+	presets: CompanionPresetDefinitions<ModuleInstanceTypes>
 } {
-	const presets: CompanionPresetDefinitions = {}
+	const presets: CompanionPresetDefinitions<ModuleInstanceTypes> = {}
 	const categories: CompanionPresetCategories = {}
 
-	const addPreset = (id: string, category: string, preset: CompanionSimplePresetDefinition) => {
+	const addPreset = (id: string, category: string, preset: CompanionSimplePresetDefinition<ModuleInstanceTypes>) => {
 		presets[id] = preset
 		if (!categories[category]) {
 			categories[category] = []
@@ -422,11 +423,13 @@ export function getPresets(device: Device): {
 			})
 	}
 
-	const structure: CompanionPresetSection[] = Object.entries(categories).map(([category, ids]) => ({
-		id: category.toLowerCase().replace(/\s+/g, '_'),
-		name: category,
-		definitions: ids,
-	}))
+	const structure: CompanionPresetSection<ModuleInstanceTypes>[] = Object.entries(categories).map(
+		([category, ids]) => ({
+			id: category.toLowerCase().replace(/\s+/g, '_'),
+			name: category,
+			definitions: ids,
+		}),
+	)
 
 	return { structure, presets }
 }

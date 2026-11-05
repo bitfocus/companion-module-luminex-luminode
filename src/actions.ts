@@ -1,4 +1,4 @@
-import type { CompanionActionDefinition } from '@companion-module/base'
+import type { CompanionActionDefinitions } from '@companion-module/base'
 import { Device } from './device.js'
 
 export enum ActionId {
@@ -17,7 +17,25 @@ export enum ActionId {
 	RecordSnapshot = 'record_snapshot',
 }
 
-export function getActions(device: Device): { [id in ActionId]: CompanionActionDefinition } {
+export type ActionSchemas = {
+	[ActionId.Identify]: { options: Record<string, never> }
+	[ActionId.Reboot]: { options: Record<string, never> }
+	[ActionId.Reset]: { options: { keep_ip_settings: boolean; keep_user_profiles: boolean } }
+	[ActionId.RecallProfile]: { options: { profile: number; keep_ip_settings: boolean } }
+	[ActionId.SaveProfile]: { options: { profile: number; name: string } }
+	[ActionId.DisplayOn]: { options: { display_on: boolean } }
+	[ActionId.DmxAcknowledge]: { options: Record<string, never> }
+	[ActionId.DmxAcknowledgePort]: { options: { port: number } }
+	[ActionId.ForceRdmDiscovery]: { options: Record<string, never> }
+	[ActionId.ForceRdmDiscoveryPort]: { options: { port: number } }
+	[ActionId.PlayControl]: { options: { action: string } }
+	[ActionId.PlaySnapshot]: { options: { snapshot_id: string } }
+	[ActionId.RecordSnapshot]: {
+		options: { show_idx: number; snapshot_id: string; fade_in_time: number; hold_time: number }
+	}
+}
+
+export function getActions(device: Device): CompanionActionDefinitions<ActionSchemas> {
 	const playActions = [
 		{ id: 'go', label: 'Go' },
 		{ id: 'forward', label: 'Forward' },
@@ -25,7 +43,7 @@ export function getActions(device: Device): { [id in ActionId]: CompanionActionD
 		{ id: 'reset', label: 'Reset' },
 	]
 
-	const actions: { [id in ActionId]: CompanionActionDefinition } = {
+	const actions: CompanionActionDefinitions<ActionSchemas> = {
 		[ActionId.Identify]: {
 			name: 'Identify',
 			options: [],
@@ -48,12 +66,14 @@ export function getActions(device: Device): { [id in ActionId]: CompanionActionD
 					type: 'checkbox',
 					label: 'Keep IP Settings',
 					default: true,
+					disableAutoExpression: true,
 				},
 				{
 					id: 'keep_user_profiles',
 					type: 'checkbox',
 					label: 'Keep User Profiles',
 					default: true,
+					disableAutoExpression: true,
 				},
 			],
 			callback: (action) => {
@@ -74,6 +94,7 @@ export function getActions(device: Device): { [id in ActionId]: CompanionActionD
 					type: 'checkbox',
 					label: 'Display On',
 					default: true,
+					disableAutoExpression: true,
 				},
 			],
 			callback: (action) => {
@@ -97,6 +118,7 @@ export function getActions(device: Device): { [id in ActionId]: CompanionActionD
 					type: 'checkbox',
 					label: 'Keep Ip Settings',
 					default: true,
+					disableAutoExpression: true,
 				},
 			],
 			callback: (action) => {
@@ -128,14 +150,13 @@ export function getActions(device: Device): { [id in ActionId]: CompanionActionD
 				},
 			],
 			callback: (action) => {
-				if (action.options.profile === undefined || action.options.name === undefined) {
+				const name = String(action.options.name ?? '')
+				if (action.options.profile === undefined || name === '') {
 					device.log('info', `No profile number or name defined`)
 					return
 				}
 				const profile = Number(action.options.profile)
-				device.sendCommand(`profile/${profile - 1}/save`, 'POST', {
-					name: action.options.name,
-				})
+				device.sendCommand(`profile/${profile - 1}/save`, 'POST', { name })
 			},
 		},
 
@@ -202,6 +223,7 @@ export function getActions(device: Device): { [id in ActionId]: CompanionActionD
 					id: 'action',
 					default: 'go',
 					choices: playActions,
+					disableAutoExpression: true,
 				},
 			],
 			callback: (action) => {
@@ -216,7 +238,7 @@ export function getActions(device: Device): { [id in ActionId]: CompanionActionD
 					label: 'Snapshot ID',
 					id: 'snapshot_id',
 					default: '1.00',
-					regex: '^d+(.d{1,2})?$',
+					regex: '^\\d+(\\.\\d{1,2})?$',
 					useVariables: true,
 				},
 			],
@@ -241,7 +263,7 @@ export function getActions(device: Device): { [id in ActionId]: CompanionActionD
 					label: 'Snapshot ID',
 					id: 'snapshot_id',
 					default: '1.00',
-					regex: '^d+(.d{1,2})?$',
+					regex: '^\\d+(\\.\\d{1,2})?$',
 					useVariables: true,
 				},
 				{

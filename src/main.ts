@@ -1,15 +1,24 @@
-import { InstanceBase, InstanceStatus, type InstanceTypes, type SomeCompanionConfigField } from '@companion-module/base'
+import {
+	InstanceBase,
+	type CompanionActionDefinitions,
+	type CompanionFeedbackDefinitions,
+	InstanceStatus,
+	type InstanceTypes,
+	type SomeCompanionConfigField,
+} from '@companion-module/base'
 import { type config, type secrets, getConfigFields } from './config.js'
-import { getActions } from './actions.js'
+import { getActions, type ActionSchemas } from './actions.js'
 import { getPresets } from './presets.js'
 import { getVariables } from './variables.js'
-import { getFeedbacks } from './feedbacks.js'
+import { getFeedbacks, type FeedbackSchemas } from './feedbacks.js'
 import { upgradeScripts } from './upgrades.js'
 import { Device } from './device.js'
 
 export interface ModuleInstanceTypes extends InstanceTypes {
 	config: config
 	secrets: secrets
+	actions: ActionSchemas
+	feedbacks: FeedbackSchemas
 }
 
 export default class ModuleInstance extends InstanceBase<ModuleInstanceTypes> {
@@ -82,7 +91,7 @@ export default class ModuleInstance extends InstanceBase<ModuleInstanceTypes> {
 			const feedbacks = getFeedbacks(this.device)
 			this.setFeedbackDefinitions(feedbacks)
 		} else {
-			this.setFeedbackDefinitions({})
+			this.setFeedbackDefinitions({} as CompanionFeedbackDefinitions<FeedbackSchemas>)
 		}
 	}
 
@@ -100,7 +109,7 @@ export default class ModuleInstance extends InstanceBase<ModuleInstanceTypes> {
 			const actions = getActions(this.device)
 			this.setActionDefinitions(actions)
 		} else {
-			this.setActionDefinitions({})
+			this.setActionDefinitions({} as CompanionActionDefinitions<ActionSchemas>)
 		}
 	}
 
